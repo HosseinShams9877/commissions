@@ -1,0 +1,300 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ====== فروشندگان ======
+model SalesPerson {
+  id              String   @id @default(cuid())
+  name            String
+  code            String   @unique
+  bankName        String?
+  cardNumber      String?
+  shebaNumber     String?
+  defaultPercentage Float   @default(0)
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  percentageCommissions PercentageCommission[]
+  tieredCommissions     TieredCommission[]
+  finderFees            FinderFee[]
+  testCosts             TestCost[]
+  repairCosts           RepairCost[]
+  salesShares           SalesShare[]
+  bonusPenalties        BonusPenalty[]
+  salesTargets          SalesTarget[]
+  collections           Collection[]
+  settlements           Settlement[]
+  ledTeams              Team[]                @relation("TeamLeader")
+  teamMemberships       TeamMember[]
+}
+
+// ====== تیم‌های فروش ======
+model Team {
+  id              String   @id @default(cuid())
+  name            String
+  leaderId        String
+  personalPercent Float    @default(0)
+  teamPercent     Float    @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  leader    SalesPerson  @relation("TeamLeader", fields: [leaderId], references: [id])
+  members   TeamMember[]
+  commissions TeamCommission[]
+
+  @@map("teams")
+}
+
+model TeamMember {
+  id     String @id @default(cuid())
+  teamId String
+  personId String
+
+  team   Team        @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  person SalesPerson @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, personId])
+}
+
+// ====== پورسانت درصدی ======
+model PercentageCommission {
+  id              String   @id @default(cuid())
+  salesPersonId   String
+  periodYear      Int
+  periodMonth     Int
+  salesAmount     Float
+  percentage      Float
+  commissionAmount Float
+  createdAt       DateTime @default(now())
+
+  salesPerson SalesPerson @relation(fields: [salesPersonId], references: [id], onDelete: Cascade)
+
+  @@index([salesPersonId])
+  @@index([periodYear, periodMonth])
+}
+
+// ====== پورسانت پلکانی ======
+model TieredCommission {
+  id              String   @id @default(cuid())
+  salesPersonId   String
+  periodYear      Int
+  periodMonth     Int
+  salesAmount     Float
+  commissionAmount Float
+  mode            String   @default("proportional") // proportional | stepped
+  tiersJson       String   // JSON string of Tier[]
+  createdAt       DateTime @default(now())
+
+  salesPerson SalesPerson @relation(fields: [salesPersonId], references: [id], onDelete: Cascade)
+
+  @@index([salesPersonId])
+  @@index([periodYear, periodMonth])
+}
+
+// ====== حق‌النصب ======
+model FinderFee {
+  id            String   @id @default(cuid())
+  salesPersonId String
+  periodYear    Int
+  periodMonth   Int
+  description   String
+  amount        Float
+  createdAt     DateTime @default(now())
+
+  salesPerson SalesPerson @relation(fields: [salesPersonId], references: [id], onDelete: Cascade)
+
+  @@index([salesPersonId])
+  @@index([periodYear, periodMonth])
+}
+
+// ====== هزینه تست ======
+model TestCost {
+  id            String   @id @default(cuid())
+  salesPersonId String
+  periodYear    Int
+  periodMonth   Int
+  description   String
+  amount        Float
+  createdAt     DateTime @default(now())
+
+  salesPerson SalesPerson @relation(fields: [salesPersonId], references: [id], onDelete: Cascade)
+
+  @@index([salesPersonId])
+  @@index([periodYear, periodMonth])
+}
+
+// ====== تعمیرات ======
+model RepairCost {
+  id            String   @id @default(cuid())
+  salesPersonId String
+  periodYear    Int
+  periodMonth   Int
+  description   String
+  amount        Float
+  createdAt     DateTime @default(now())
+
+  salesPerson SalesPerson @relation(fields: [salesPersonId], references: [id], onDelete: Cascade)
+
+  @@index([salesPersonId])
+  @@index([periodYear, periodMonth])
+}
+
+// ====== سهم از فروش ======
+model SalesShare {
+  id             String   @id @default(cuid())
+  salesPersonId  String
+  periodYear     Int
+  periodMonth    Int
+  totalSales     Float
+  sharePercentage Float
+  shareAmount    Float
+  createdAt      DateTime @default(now())
+
+  salesPerson SalesPerson @relation(fields: [salesPersonId], references: [id], onDelete: Cascade)
+
+  @@index([salesPersonId])
+  @@index([periodYear, periodMonth])
+}
+
+// ====== پورسانت تیمی ======
+model TeamCommission {
+  id                    String   @id @default(cuid())
+  teamId                String
+  periodYear            Int
+  periodMonth           Int
+  leaderPersonalSales   Float
+  leaderPersonalCommission Float
+  totalTeamSales        Float
+  teamCommissionAmount  Float
+  totalLeaderCommission Float
+  createdAt             DateTime @default(now())
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@index([teamId])
+  @@index([periodYear, periodMonth])
+}
+
+// ====== پاداش / جریمه ======
+model BonusPenalty {
+  id            String   @id @default(cuid())
+  salesPersonId String
+  periodYear    Int
+  periodMonth   Int
+  type          String   // bonus | penalty
+  amount        Float
+  reason        String
+  createdAt     DateTime @default(now())
+
+  salesPerson SalesPerson @relation(fields: [salesPersonId], references: [id], onDelete: Cascade)
+
+  @@index([salesPersonId])
+  @@index([periodYear, periodMonth])
+}
+
+// ====== هدف فروش ======
+model SalesTarget {
+  id            String   @id @default(cuid())
+  salesPersonId String
+  periodYear    Int
+  periodMonth   Int
+  targetAmount  Float
+  achievedAmount Float  @default(0)
+  targetPercent Float   @default(0)
+  bonusPercent  Float   @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  salesPerson SalesPerson @relation(fields: [salesPersonId], references: [id], onDelete: Cascade)
+
+  @@index([salesPersonId])
+  @@index([periodYear, periodMonth])
+}
+
+// ====== وصول ======
+model Collection {
+  id            String   @id @default(cuid())
+  salesPersonId String
+  periodYear    Int
+  periodMonth   Int
+  amount        Float
+  date          String
+  description   String
+  createdAt     DateTime @default(now())
+
+  salesPerson SalesPerson @relation(fields: [salesPersonId], references: [id], onDelete: Cascade)
+
+  @@index([salesPersonId])
+  @@index([periodYear, periodMonth])
+}
+
+// ====== تسویه ======
+model Settlement {
+  id            String   @id @default(cuid())
+  salesPersonId String
+  periodYear    Int
+  periodMonth   Int
+  amount        Float
+  date          String
+  description   String
+  createdAt     DateTime @default(now())
+
+  salesPerson SalesPerson @relation(fields: [salesPersonId], references: [id], onDelete: Cascade)
+
+  @@index([salesPersonId])
+  @@index([periodYear, periodMonth])
+}
+
+// ====== پشتیبان‌گیری ======
+model Backup {
+  id          String   @id @default(cuid())
+  name        String
+  dataJson    String   // Full JSON export
+  size        Int      @default(0)
+  createdAt   DateTime @default(now())
+}
+
+// ====== کاربران ======
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String?  @unique
+  username  String   @unique
+  password  String   // hashed with bcryptjs
+  role      String   @default("USER") // ADMIN | MANAGER | USER
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ====== لاگ ممیزی ======
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  action     String   // CREATE, UPDATE, DELETE, LOGIN, EXPORT, IMPORT
+  entity     String   // SalesPerson, Commission, Team, etc.
+  entityId   String?
+  details    String?  // JSON string of changed fields
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  @@index([entity])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// ====== تنظیمات ======
+model Setting {
+  id    String @id @default(cuid())
+  key   String @unique
+  value String
+}
