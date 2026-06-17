@@ -10,9 +10,24 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { UserPlus, Trash2, Pencil, Users } from 'lucide-react';
+import { 
+  useSalesPersons,
+  useCreateSalesPerson,
+  useUpdateSalesPerson,
+  useDeleteSalesPerson,
+} from '@/hooks/use-api';
+import { toast } from 'sonner';
 
 export function SalesPersonManager() {
-  const { salesPersons, addSalesPerson, removeSalesPerson, updateSalesPerson } = useCommissionStore();
+  const { data: salesPersonsData } = useSalesPersons();
+  
+  // Mutations
+  const createSalesPersonMutation = useCreateSalesPerson();
+  const updateSalesPersonMutation = useUpdateSalesPerson();
+  const deleteSalesPersonMutation = useDeleteSalesPerson();
+  
+  // داده‌های محلی
+  const salesPersons = salesPersonsData?.salesPersons || [];
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [name, setName] = useState('');
@@ -25,17 +40,44 @@ export function SalesPersonManager() {
   const handleSubmit = () => {
     if (!name.trim() || !code.trim()) return;
     const pct = parseFloat(defaultPercentage) || 0;
+    
     if (editId) {
-      updateSalesPerson(editId, { name, code, bankName, cardNumber, shebaNumber, defaultPercentage: pct });
+      updateSalesPersonMutation.mutate({
+        id: editId,
+        name,
+        code,
+        bankName,
+        cardNumber,
+        shebaNumber,
+        defaultPercentage: pct,
+      });
       setEditId(null);
     } else {
-      addSalesPerson(name, code, bankName, cardNumber, shebaNumber, pct);
+      createSalesPersonMutation.mutate({
+        name,
+        code,
+        bankName,
+        cardNumber,
+        shebaNumber,
+        defaultPercentage: pct,
+      });
     }
     setName(''); setCode(''); setBankName(''); setCardNumber(''); setShebaNumber(''); setDefaultPercentage(''); setOpen(false);
   };
-
+  const handleDelete = (id: string) => {
+    if (confirm('آیا از حذف اطمینان دارید؟')) {
+      deleteSalesPersonMutation.mutate(id);
+    }
+  };
   const handleEdit = (id: string, sp: { name: string; code: string; bankName?: string; cardNumber?: string; shebaNumber?: string; defaultPercentage?: number }) => {
-    setEditId(id); setName(sp.name); setCode(sp.code); setBankName(sp.bankName || ''); setCardNumber(sp.cardNumber || ''); setShebaNumber(sp.shebaNumber || ''); setDefaultPercentage(sp.defaultPercentage?.toString() || ''); setOpen(true);
+    setEditId(id); 
+    setName(sp.name); 
+    setCode(sp.code); 
+    setBankName(sp.bankName || ''); 
+    setCardNumber(sp.cardNumber || ''); 
+    setShebaNumber(sp.shebaNumber || ''); 
+    setDefaultPercentage(sp.defaultPercentage?.toString() || ''); 
+    setOpen(true);
   };
 
   const handleOpenChange = (isOpen: boolean) => {
@@ -141,7 +183,8 @@ export function SalesPersonManager() {
                         <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-amber-50 hover:text-amber-600 active:scale-90 transition-all" onClick={() => handleEdit(sp.id, sp)}>
                           <Pencil className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-red-50 hover:text-red-600 active:scale-90 transition-all" onClick={() => { if (confirm('آیا از حذف اطمینان دارید؟')) removeSalesPerson(sp.id); }}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-red-50 hover:text-red-600 active:scale-90 transition-all" 
+                        onClick={() => handleDelete(sp.id)}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>

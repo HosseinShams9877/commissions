@@ -56,9 +56,9 @@ function SidebarContent({ sidebarCollapsed, activeTab, onTabChange, onToggleSide
   const years = Array.from({ length: 11 }, (_, i) => 1400 + i);
   const [shamsiNow, setShamsiNow] = useState<{ year: number; month: number; day: number } | null>(null);
 
-  useEffect(() => {
-    setShamsiNow(getCurrentShamsiDate());
-  }, []);
+useEffect(() => {
+  setShamsiNow(getCurrentShamsiDate());
+}, []);
 
   return (
     <div className="flex flex-col h-full bg-gradient-to-b from-emerald-950 via-emerald-900 to-teal-950">
@@ -167,7 +167,7 @@ function SidebarContent({ sidebarCollapsed, activeTab, onTabChange, onToggleSide
           </div>
         ) : (
           <div className="text-[10px] text-emerald-300/50 text-center">
-              {shamsiNow ? toPersianDigits(shamsiNow.day) : '—'}
+            {toPersianDigits(shamsiNow.day)}
           </div>
         ))}
       </div>
@@ -226,7 +226,7 @@ export default function Home() {
 
   return (
     <NotificationProvider>
-    <div dir="rtl" className="min-h-screen bg-gradient-to-br from-emerald-50/40 via-white to-teal-50/30 main-content-bg" suppressHydrationWarning>
+    <div dir="rtl" className="min-h-screen bg-gradient-to-br from-emerald-50/40 via-white to-teal-50/30 main-content-bg">
       {/* Mobile Header */}
       <div className="md:hidden bg-white/80 backdrop-blur-md border-b border-emerald-100 shadow-sm sticky top-0 z-50">
         <div className="flex items-center justify-between px-4 py-3">

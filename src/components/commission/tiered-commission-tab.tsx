@@ -1,16 +1,26 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import { useCommissionStore, calculateTieredCommission, getEffectiveTierPercentage, getSteppedTierPercentage } from '@/lib/store';
+import { useCommissionStore, getEffectiveTierPercentage, getSteppedTierPercentage } from '@/lib/store';
 import { formatCurrency, formatNumber, formatPercent, toPersianDigits, cn } from '@/lib/utils';
 import { Tier } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { 
+  useSalesPersons,
+  useTieredCommissions, 
+  useCreateTieredCommission, 
+  useDeleteTieredCommission,
+  useCreateSalesPerson,
+  usePercentageCommissions,
+  useTieredCommissions as useTieredCommissionsData,
+} from '@/hooks/use-api';
 import { Layers, Trash2, Plus, X, Info, TrendingUp, Calculator, ChevronDown, ChevronUp, Award } from 'lucide-react';
 import { ExcelImport, ImportColumn } from './excel-import';
 
@@ -34,8 +44,18 @@ const DEFAULT_TIERS_STEPPED: Tier[] = [
 ];
 
 export function TieredCommissionTab() {
-  const { salesPersons, currentPeriod, getMonthlyData, addTieredCommission, removeTieredCommission } = useCommissionStore();
-  const data = getMonthlyData(currentPeriod);
+  const { currentPeriod } = useCommissionStore();
+  
+  const { data: salesPersonsData } = useSalesPersons();
+  const { data: tieredData } = useTieredCommissionsData(currentPeriod.year, currentPeriod.month);
+  
+  const createTieredCommission = useCreateTieredCommission();
+  const deleteTieredCommission = useDeleteTieredCommission();
+  const createSalesPerson = useCreateSalesPerson();
+  
+  const salesPersons = salesPersonsData?.salesPersons || [];
+  const tieredCommissions = tieredData?.tieredCommissions || [];
+
 
   return (
     <Tabs defaultValue="proportional" className="space-y-6" dir="rtl">
@@ -49,24 +69,44 @@ export function TieredCommissionTab() {
           سقفی (غیر تناسبی)
         </TabsTrigger>
       </TabsList>
-
       <TabsContent value="proportional">
-        <ProportionalTieredTab salesPersons={salesPersons} currentPeriod={currentPeriod} data={data} addTieredCommission={addTieredCommission} removeTieredCommission={removeTieredCommission} />
-      </TabsContent>
-
-      <TabsContent value="stepped">
-        <SteppedTieredTab salesPersons={salesPersons} currentPeriod={currentPeriod} data={data} addTieredCommission={addTieredCommission} removeTieredCommission={removeTieredCommission} />
-      </TabsContent>
+  <ProportionalTieredTab 
+    salesPersons={salesPersons} 
+    currentPeriod={currentPeriod} 
+    tieredCommissions={tieredCommissions}
+    createTieredCommission={createTieredCommission}
+    deleteTieredCommission={deleteTieredCommission}
+    createSalesPerson={createSalesPerson}
+  />
+</TabsContent>
+<TabsContent value="stepped">
+  <SteppedTieredTab 
+    salesPersons={salesPersons} 
+    currentPeriod={currentPeriod} 
+    tieredCommissions={tieredCommissions}
+    createTieredCommission={createTieredCommission}
+    deleteTieredCommission={deleteTieredCommission}
+    createSalesPerson={createSalesPerson}
+  />
+</TabsContent>
     </Tabs>
   );
 }
 
-function ProportionalTieredTab({ salesPersons, currentPeriod, data, addTieredCommission, removeTieredCommission }: {
+function ProportionalTieredTab({ 
+  salesPersons, 
+  currentPeriod, 
+  tieredCommissions, 
+  createTieredCommission, 
+  deleteTieredCommission,
+  createSalesPerson,
+}: {
   salesPersons: { id: string; name: string; code: string }[];
   currentPeriod: { year: number; month: number };
-  data: import('@/lib/types').MonthlyData;
-  addTieredCommission: (period: { year: number; month: number }, data: Omit<import('@/lib/types').TieredCommission, 'id' | 'commissionAmount'>) => void;
-  removeTieredCommission: (period: { year: number; month: number }, id: string) => void;
+  tieredCommissions: any[];
+  createTieredCommission: any;
+  deleteTieredCommission: any;
+  createSalesPerson: any;
 }) {
   const [salesPersonId, setSalesPersonId] = useState('');
   const [salesAmount, setSalesAmount] = useState('');
@@ -74,24 +114,67 @@ function ProportionalTieredTab({ salesPersons, currentPeriod, data, addTieredCom
   const [tiers, setTiers] = useState<Tier[]>(DEFAULT_TIERS_PROPORTIONAL.map(t => ({ ...t })));
 
   // Handle Excel import
-  const handleExcelImport = (rows: Record<string, string | number>[]) => {
+  const handleExcelImport = async (rows: Record<string, string | number>[]) => {
+    let successCount = 0;
+    let errorCount = 0;
+  
     for (const row of rows) {
-      const name = String(row.name || '').trim();
-      const code = String(row.code || '').trim() || name;
-      const salesAmount = Number(row.salesAmount) || 0;
-      if (!name || salesAmount <= 0) continue;
-
-      let person = salesPersons.find(sp => sp.name.trim() === name);
-      if (!person) person = salesPersons.find(sp => sp.code.trim() === code);
-      let personId = person?.id;
-      if (!personId) {
-        useCommissionStore.getState().addSalesPerson(name, code);
-        const state = useCommissionStore.getState();
-        personId = state.salesPersons.find(sp => sp.name.trim() === name)?.id;
+      try {
+        const name = String(row.name || '').trim();
+        const code = String(row.code || '').trim() || name;
+        const salesAmount = Number(row.salesAmount) || 0;
+        
+        if (!name || salesAmount <= 0) {
+          errorCount++;
+          continue;
+        }
+  
+        let person = salesPersons.find(sp => sp.name.trim() === name);
+        if (!person) person = salesPersons.find(sp => sp.code.trim() === code);
+        let personId = person?.id;
+  
+        if (!personId) {
+          try {
+            const newPerson = await createSalesPerson.mutateAsync({
+              name,
+              code,
+            });
+            personId = newPerson.data.id;
+            salesPersons.push(newPerson.data);
+          } catch (err) {
+            console.error('خطا در ایجاد فروشنده:', err);
+            errorCount++;
+            continue;
+          }
+        }
+  
+        if (personId) {
+          try {
+            await createTieredCommission.mutateAsync({
+              salesPersonId: personId,
+              salesAmount,
+              tiers,
+              mode: 'proportional',
+              periodYear: currentPeriod.year,
+              periodMonth: currentPeriod.month,
+            });
+            successCount++;
+          } catch (err) {
+            console.error('خطا در ثبت پورسانت پلکانی:', err);
+            errorCount++;
+          }
+        }
+      } catch (err) {
+        console.error('خطا در پردازش ردیف:', err);
+        errorCount++;
       }
-      if (personId) {
-        addTieredCommission(currentPeriod, { salesPersonId: personId, salesAmount, tiers, mode: 'proportional' });
-      }
+    }
+  
+    if (successCount > 0) {
+      toast.success(`${successCount} پورسانت پلکانی با موفقیت ثبت شد`);
+    }
+    if (errorCount > 0) {
+      toast.error(`${errorCount} ردیف با خطا مواجه شد`);
     }
   };
 
@@ -126,11 +209,28 @@ function ProportionalTieredTab({ salesPersons, currentPeriod, data, addTieredCom
 
   const handleAdd = () => {
     if (!salesPersonId || !salesAmount || tiers.length === 0) return;
-    addTieredCommission(currentPeriod, { salesPersonId, salesAmount: parseFloat(salesAmount), tiers, mode: 'proportional' });
+    createTieredCommission.mutate({
+      salesPersonId,
+      salesAmount: parseFloat(salesAmount),
+      tiers,
+      mode: 'proportional',
+      periodYear: currentPeriod.year,
+      periodMonth: currentPeriod.month,
+    });
     setSalesPersonId(''); setSalesAmount('');
   };
 
-  const totalCommission = data.tieredCommissions.filter(tc => tc.mode === 'proportional' || !tc.mode).reduce((sum, tc) => sum + tc.commissionAmount, 0);
+  const handleDelete = (id: string) => {
+    if (confirm('آیا از حذف اطمینان دارید؟')) {
+      deleteTieredCommission.mutate({
+        id,
+        year: currentPeriod.year,
+        month: currentPeriod.month,
+      });
+    }
+  };
+
+  const totalCommission = tieredCommissions.filter(tc => tc.mode === 'proportional' || !tc.mode).reduce((sum, tc) => sum + tc.commissionAmount, 0);
 
   return (
     <div className="space-y-6">
@@ -229,7 +329,7 @@ function ProportionalTieredTab({ salesPersons, currentPeriod, data, addTieredCom
         </Card>
       )}
 
-      {data.tieredCommissions.filter(tc => tc.mode === 'proportional' || !tc.mode).length > 0 && (
+      {tieredCommissions.filter(tc => tc.mode === 'proportional' || !tc.mode).length > 0 && (
         <Card className="rounded-2xl shadow-sm border overflow-hidden">
           <CardContent className="p-0">
             <div className="overflow-x-auto">
@@ -243,8 +343,8 @@ function ProportionalTieredTab({ salesPersons, currentPeriod, data, addTieredCom
                   <TableHead className="text-right font-semibold text-violet-800 text-xs">عملیات</TableHead>
                 </TableRow></TableHeader>
                 <TableBody>
-                  {data.tieredCommissions.filter(tc => tc.mode === 'proportional' || !tc.mode).map((tc, idx) => {
-                    const effPct = getEffectiveTierPercentage(tc.salesAmount, tc.tiers);
+                  {tieredCommissions.filter(tc => tc.mode === 'proportional' || !tc.mode).map((tc, idx) => {
+                   const effPct = getEffectiveTierPercentage(tc.salesAmount, tc.tiers || []);
                     return (
                       <TableRow key={tc.id}>
                         <TableCell className="text-muted-foreground text-xs">{toPersianDigits(idx + 1)}</TableCell>
@@ -252,7 +352,8 @@ function ProportionalTieredTab({ salesPersons, currentPeriod, data, addTieredCom
                         <TableCell className="text-left font-mono tabular-nums" dir="ltr">{formatNumber(tc.salesAmount)}</TableCell>
                         <TableCell><Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 font-mono">{formatPercent(Math.round(effPct * 10000) / 10000)}</Badge></TableCell>
                         <TableCell className="font-bold text-violet-700 text-left font-mono tabular-nums" dir="ltr">{formatNumber(tc.commissionAmount)}</TableCell>
-                        <TableCell><Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-red-50 active:scale-90" onClick={() => { if (confirm('آیا از حذف اطمینان دارید؟')) removeTieredCommission(currentPeriod, tc.id); }}><Trash2 className="h-4 w-4" /></Button></TableCell>
+                        <TableCell><Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-red-50 active:scale-90" 
+                        onClick={() => handleDelete(tc.id)}><Trash2 className="h-4 w-4" /></Button></TableCell>
                       </TableRow>
                     );
                   })}
@@ -266,12 +367,20 @@ function ProportionalTieredTab({ salesPersons, currentPeriod, data, addTieredCom
   );
 }
 
-function SteppedTieredTab({ salesPersons, currentPeriod, data, addTieredCommission, removeTieredCommission }: {
+function SteppedTieredTab({ 
+  salesPersons, 
+  currentPeriod, 
+  tieredCommissions, 
+  createTieredCommission, 
+  deleteTieredCommission,
+  createSalesPerson,
+}: {
   salesPersons: { id: string; name: string; code: string }[];
   currentPeriod: { year: number; month: number };
-  data: import('@/lib/types').MonthlyData;
-  addTieredCommission: (period: { year: number; month: number }, data: Omit<import('@/lib/types').TieredCommission, 'id' | 'commissionAmount'>) => void;
-  removeTieredCommission: (period: { year: number; month: number }, id: string) => void;
+  tieredCommissions: any[];
+  createTieredCommission: any;
+  deleteTieredCommission: any;
+  createSalesPerson: any;
 }) {
   const [salesPersonId, setSalesPersonId] = useState('');
   const [salesAmount, setSalesAmount] = useState('');
@@ -279,24 +388,67 @@ function SteppedTieredTab({ salesPersons, currentPeriod, data, addTieredCommissi
   const [tiers, setTiers] = useState<Tier[]>(DEFAULT_TIERS_STEPPED.map(t => ({ ...t })));
 
   // Handle Excel import
-  const handleExcelImport = (rows: Record<string, string | number>[]) => {
+  const handleExcelImport = async (rows: Record<string, string | number>[]) => {
+    let successCount = 0;
+    let errorCount = 0;
+  
     for (const row of rows) {
-      const name = String(row.name || '').trim();
-      const code = String(row.code || '').trim() || name;
-      const salesAmount = Number(row.salesAmount) || 0;
-      if (!name || salesAmount <= 0) continue;
-
-      let person = salesPersons.find(sp => sp.name.trim() === name);
-      if (!person) person = salesPersons.find(sp => sp.code.trim() === code);
-      let personId = person?.id;
-      if (!personId) {
-        useCommissionStore.getState().addSalesPerson(name, code);
-        const state = useCommissionStore.getState();
-        personId = state.salesPersons.find(sp => sp.name.trim() === name)?.id;
+      try {
+        const name = String(row.name || '').trim();
+        const code = String(row.code || '').trim() || name;
+        const salesAmount = Number(row.salesAmount) || 0;
+        
+        if (!name || salesAmount <= 0) {
+          errorCount++;
+          continue;
+        }
+  
+        let person = salesPersons.find(sp => sp.name.trim() === name);
+        if (!person) person = salesPersons.find(sp => sp.code.trim() === code);
+        let personId = person?.id;
+  
+        if (!personId) {
+          try {
+            const newPerson = await createSalesPerson.mutateAsync({
+              name,
+              code,
+            });
+            personId = newPerson.data.id;
+            salesPersons.push(newPerson.data);
+          } catch (err) {
+            console.error('خطا در ایجاد فروشنده:', err);
+            errorCount++;
+            continue;
+          }
+        }
+  
+        if (personId) {
+          try {
+            await createTieredCommission.mutateAsync({
+              salesPersonId: personId,
+              salesAmount,
+              tiers,
+              mode: 'stepped',
+              periodYear: currentPeriod.year,
+              periodMonth: currentPeriod.month,
+            });
+            successCount++;
+          } catch (err) {
+            console.error('خطا در ثبت پورسانت پلکانی:', err);
+            errorCount++;
+          }
+        }
+      } catch (err) {
+        console.error('خطا در پردازش ردیف:', err);
+        errorCount++;
       }
-      if (personId) {
-        addTieredCommission(currentPeriod, { salesPersonId: personId, salesAmount, tiers, mode: 'stepped' });
-      }
+    }
+  
+    if (successCount > 0) {
+      toast.success(`${successCount} پورسانت پلکانی با موفقیت ثبت شد`);
+    }
+    if (errorCount > 0) {
+      toast.error(`${errorCount} ردیف با خطا مواجه شد`);
     }
   };
 
@@ -318,11 +470,28 @@ function SteppedTieredTab({ salesPersons, currentPeriod, data, addTieredCommissi
 
   const handleAdd = () => {
     if (!salesPersonId || !salesAmount || tiers.length === 0) return;
-    addTieredCommission(currentPeriod, { salesPersonId, salesAmount: parseFloat(salesAmount), tiers, mode: 'stepped' });
+    createTieredCommission.mutate({
+      salesPersonId,
+      salesAmount: parseFloat(salesAmount),
+      tiers,
+      mode: 'stepped',
+      periodYear: currentPeriod.year,
+      periodMonth: currentPeriod.month,
+    });
     setSalesPersonId(''); setSalesAmount('');
   };
 
-  const totalCommission = data.tieredCommissions.filter(tc => tc.mode === 'stepped').reduce((sum, tc) => sum + tc.commissionAmount, 0);
+  const handleDelete = (id: string) => {
+    if (confirm('آیا از حذف اطمینان دارید؟')) {
+      deleteTieredCommission.mutate({
+        id,
+        year: currentPeriod.year,
+        month: currentPeriod.month,
+      });
+    }
+  };
+
+  const totalCommission = tieredCommissions.filter(tc => tc.mode === 'stepped').reduce((sum, tc) => sum + tc.commissionAmount, 0);
 
   return (
     <div className="space-y-6">
@@ -422,7 +591,7 @@ function SteppedTieredTab({ salesPersons, currentPeriod, data, addTieredCommissi
         </Card>
       )}
 
-      {data.tieredCommissions.filter(tc => tc.mode === 'stepped').length > 0 && (
+      {tieredCommissions.filter(tc => tc.mode === 'stepped').length > 0 && (
         <Card className="rounded-2xl shadow-sm border overflow-hidden">
           <CardContent className="p-0">
             <div className="overflow-x-auto">
@@ -436,8 +605,8 @@ function SteppedTieredTab({ salesPersons, currentPeriod, data, addTieredCommissi
                   <TableHead className="text-right font-semibold text-amber-800 text-xs">عملیات</TableHead>
                 </TableRow></TableHeader>
                 <TableBody>
-                  {data.tieredCommissions.filter(tc => tc.mode === 'stepped').map((tc, idx) => {
-                    const pct = getSteppedTierPercentage(tc.salesAmount, tc.tiers);
+                  {tieredCommissions.filter(tc => tc.mode === 'stepped').map((tc, idx) => {
+                    const pct = getSteppedTierPercentage(tc.salesAmount, tc.tiers || []);
                     return (
                       <TableRow key={tc.id}>
                         <TableCell className="text-muted-foreground text-xs">{toPersianDigits(idx + 1)}</TableCell>
@@ -445,7 +614,8 @@ function SteppedTieredTab({ salesPersons, currentPeriod, data, addTieredCommissi
                         <TableCell className="text-left font-mono tabular-nums" dir="ltr">{formatNumber(tc.salesAmount)}</TableCell>
                         <TableCell><Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 font-mono">{formatPercent(pct)}</Badge></TableCell>
                         <TableCell className="font-bold text-amber-700 text-left font-mono tabular-nums" dir="ltr">{formatNumber(tc.commissionAmount)}</TableCell>
-                        <TableCell><Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-red-50 active:scale-90" onClick={() => { if (confirm('آیا از حذف اطمینان دارید؟')) removeTieredCommission(currentPeriod, tc.id); }}><Trash2 className="h-4 w-4" /></Button></TableCell>
+                        <TableCell><Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-red-50 active:scale-90"
+                        onClick={() => handleDelete(tc.id)}><Trash2 className="h-4 w-4" /></Button></TableCell>
                       </TableRow>
                     );
                   })}

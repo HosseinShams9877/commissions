@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { useCommissionStore, getPersonTotalSales } from '@/lib/store';
+import { useState, useMemo , useEffect } from 'react';
+import { useCommissionStore } from '@/lib/store';
 import { formatCurrency, formatNumber, formatPercent, toPersianDigits, cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,10 +10,38 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Target, Trash2, Plus, TrendingUp, TrendingDown, RefreshCw, CheckCircle2, AlertCircle, Award } from 'lucide-react';
+import { 
+  useSalesPersons,
+  useSalesTargets, 
+  useCreateSalesTarget, 
+  useUpdateSalesTarget, 
+  useDeleteSalesTarget,
+  usePercentageCommissions, 
+  useTieredCommissions,
+} from '@/hooks/use-api';
+import { toast } from 'sonner';
 
 export function SalesTargetTab() {
-  const { salesPersons, currentPeriod, getMonthlyData, addSalesTarget, updateSalesTarget, removeSalesTarget } = useCommissionStore();
-  const data = getMonthlyData(currentPeriod);
+  const { currentPeriod } = useCommissionStore();
+  
+  // گرفتن داده‌ها از API
+  const { data: salesPersonsData } = useSalesPersons();
+  const { data: salesTargetData } = useSalesTargets(currentPeriod.year, currentPeriod.month);
+  const { data: percentageData } = usePercentageCommissions(currentPeriod.year, currentPeriod.month);
+  const { data: tieredData } = useTieredCommissions(currentPeriod.year, currentPeriod.month);
+
+// داده‌های محلی
+const percentageCommissions = percentageData?.percentageCommissions || [];
+const tieredCommissions = tieredData?.tieredCommissions || [];
+  
+  // Mutations
+  const createSalesTargetMutation = useCreateSalesTarget();
+  const updateSalesTargetMutation = useUpdateSalesTarget();
+  const deleteSalesTargetMutation = useDeleteSalesTarget();
+  
+  // داده‌های محلی
+  const salesPersons = salesPersonsData?.salesPersons || [];
+  const salesTargets = salesTargetData?.salesTargets || [];
 
   const [salesPersonId, setSalesPersonId] = useState('');
   const [targetAmount, setTargetAmount] = useState('');
@@ -21,30 +49,78 @@ export function SalesTargetTab() {
 
   const handleAdd = () => {
     if (!salesPersonId || !targetAmount) return;
-    addSalesTarget(currentPeriod, { salesPersonId, targetAmount: parseFloat(targetAmount), bonusPercent: parseFloat(bonusPercent) || 0 });
+    createSalesTargetMutation.mutate({
+      salesPersonId,
+      targetAmount: parseFloat(targetAmount),
+      bonusPercent: parseFloat(bonusPercent) || 0,
+      periodYear: currentPeriod.year,
+      periodMonth: currentPeriod.month,
+    });
     setSalesPersonId(''); setTargetAmount(''); setBonusPercent('');
   };
+  // محاسبه کل فروش هر فروشنده از داده‌های API
+const getPersonTotalSales = (personId: string) => {
+  let total = 0;
+  
+  // جمع فروش از پورسانت درصدی
+  percentageCommissions
+    .filter(pc => pc.salesPersonId === personId)
+    .forEach(pc => total += pc.salesAmount);
+  
+  // جمع فروش از پورسانت پلکانی
+  tieredCommissions
+    .filter(tc => tc.salesPersonId === personId)
+    .forEach(tc => total += tc.salesAmount);
+  
+  return total;
+};
 
-  const handleRefreshAchieved = (targetId: string, personId: string) => {
-    const achieved = getPersonTotalSales(useCommissionStore.getState(), currentPeriod, personId);
-    const target = data.salesTargets.find(st => st.id === targetId);
-    const targetAmt = target?.targetAmount || 1;
-    const percent = targetAmt > 0 ? (achieved / targetAmt) * 100 : 0;
-    updateSalesTarget(currentPeriod, targetId, { achievedAmount: achieved, targetPercent: percent });
-  };
+const handleRefreshAchieved = (targetId: string, personId: string) => {
+  // محاسبه فروش از داده‌های API
+  const achieved = getPersonTotalSales(personId);
+  const target = salesTargets.find(st => st.id === targetId);
+  const targetAmt = target?.targetAmount || 1;
+  const percent = targetAmt > 0 ? (achieved / targetAmt) * 100 : 0;
+  
+  updateSalesTargetMutation.mutate({
+    id: targetId,
+    achievedAmount: achieved,
+    targetPercent: percent,
+    periodYear: currentPeriod.year,
+    periodMonth: currentPeriod.month,
+  });
+};
+
 
   const handleRefreshAll = () => {
-    for (const st of data.salesTargets) {
+    for (const st of salesTargets) {
       handleRefreshAchieved(st.id, st.salesPersonId);
+    }
+  };
+
+  const handleDelete = (id: string) => {
+    if (confirm('آیا از حذف اطمینان دارید؟')) {
+      deleteSalesTargetMutation.mutate({
+        id,
+        year: currentPeriod.year,
+        month: currentPeriod.month,
+      });
     }
   };
 
   const getPersonName = (id: string) => salesPersons.find(sp => sp.id === id)?.name || 'نامشخص';
 
   // Summary
-  const totalTarget = data.salesTargets.reduce((s, st) => s + st.targetAmount, 0);
-  const totalAchieved = data.salesTargets.reduce((s, st) => s + st.achievedAmount, 0);
+  const totalTarget = salesTargets.reduce((s, st) => s + st.targetAmount, 0);
+  const totalAchieved = salesTargets.reduce((s, st) => s + st.achievedAmount, 0);
   const avgAchievement = totalTarget > 0 ? (totalAchieved / totalTarget) * 100 : 0;
+
+  useEffect(() => {
+    if (salesTargets.length > 0) {
+      handleRefreshAll();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [percentageCommissions, tieredCommissions]);
 
   return (
     <div className="space-y-6">
@@ -84,7 +160,7 @@ export function SalesTargetTab() {
       </Card>
 
       {/* Summary Cards */}
-      {data.salesTargets.length > 0 && (
+      {salesTargets.length > 0 && (
         <>
           <div className="flex justify-end">
             <Button variant="outline" size="sm" onClick={handleRefreshAll} className="gap-1.5 border-sky-300 text-sky-700 hover:bg-sky-50 rounded-xl">
@@ -125,9 +201,9 @@ export function SalesTargetTab() {
       )}
 
       {/* Target Cards with Progress */}
-      {data.salesTargets.length > 0 && (
+      {salesTargets.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {data.salesTargets.map(st => {
+          {salesTargets.map(st => {
             const pct = st.targetPercent || 0;
             const isAchieved = pct >= 100;
             const isWarning = pct >= 70 && pct < 100;
@@ -159,7 +235,8 @@ export function SalesTargetTab() {
                       <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg hover:bg-sky-50" onClick={() => handleRefreshAchieved(st.id, st.salesPersonId)}>
                         <RefreshCw className="h-3.5 w-3.5 text-sky-500" />
                       </Button>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg hover:bg-red-50" onClick={() => { if (confirm('آیا از حذف اطمینان دارید؟')) removeSalesTarget(currentPeriod, st.id); }}>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg hover:bg-red-50"
+                      onClick={() => handleDelete(st.id)}>
                         <Trash2 className="h-3.5 w-3.5 text-red-400" />
                       </Button>
                     </div>

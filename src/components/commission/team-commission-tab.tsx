@@ -1,9 +1,23 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { useCommissionStore, getPersonTotalSales } from '@/lib/store';
+import { useState, useMemo , useEffect } from 'react';
+import { useCommissionStore} from '@/lib/store';
 import { formatCurrency, formatNumber, formatPercent, toPersianDigits, cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { 
+  useSalesPersons,
+  useTeams,
+  useTeamCommissions,
+  useCreateTeam,
+  useUpdateTeam,
+  useDeleteTeam,
+  useCreateTeamCommission,
+  useDeleteTeamCommission,
+  useCreateSalesPerson,
+  usePercentageCommissions,
+  useTieredCommissions,
+} from '@/hooks/use-api';
+import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -28,9 +42,30 @@ const TEAM_SALES_IMPORT_COLUMNS: ImportColumn[] = [
   { key: 'leaderSales', label: 'فروش شخصی سرگروه', required: true, type: 'number' },
 ];
 
-export function TeamCommissionTab() {
-  const { salesPersons, teams, addTeam, updateTeam, removeTeam, currentPeriod, getMonthlyData, addTeamCommission, removeTeamCommission } = useCommissionStore();
-  const data = getMonthlyData(currentPeriod);
+  export function TeamCommissionTab() {
+    const { currentPeriod } = useCommissionStore();
+    
+    // گرفتن داده‌ها از API
+    const { data: salesPersonsData } = useSalesPersons();
+    const { data: teamsData } = useTeams();
+    const { data: teamCommissionData } = useTeamCommissions(currentPeriod.year, currentPeriod.month);
+    const { data: percentageData } = usePercentageCommissions(currentPeriod.year, currentPeriod.month);
+    const { data: tieredData } = useTieredCommissions(currentPeriod.year, currentPeriod.month);
+    
+    // Mutations
+    const createTeamMutation = useCreateTeam();
+    const updateTeamMutation = useUpdateTeam();
+    const deleteTeamMutation = useDeleteTeam();
+    const createTeamCommissionMutation = useCreateTeamCommission();
+    const deleteTeamCommissionMutation = useDeleteTeamCommission();
+    const createSalesPersonMutation = useCreateSalesPerson();
+    
+    // داده‌های محلی
+    const salesPersons = salesPersonsData?.salesPersons || [];
+    const teams = teamsData?.teams || [];
+    const teamCommissions = teamCommissionData?.teamCommissions || [];
+    const percentageCommissions = percentageData?.percentageCommissions || [];
+    const tieredCommissions = tieredData?.tieredCommissions || [];
 
   // Team management state
   const [teamDialogOpen, setTeamDialogOpen] = useState(false);
@@ -45,6 +80,18 @@ export function TeamCommissionTab() {
   const [selectedTeamId, setSelectedTeamId] = useState('');
   const [leaderSales, setLeaderSales] = useState('');
 
+  // محاسبه کل فروش هر فروشنده از داده‌های API
+const getPersonTotalSales = (personId: string) => {
+  let total = 0;
+  percentageCommissions
+    .filter(pc => pc.salesPersonId === personId)
+    .forEach(pc => total += pc.salesAmount);
+  tieredCommissions
+    .filter(tc => tc.salesPersonId === personId)
+    .forEach(tc => total += tc.salesAmount);
+  return total;
+};
+
   const resetTeamForm = () => {
     setTeamName(''); setLeaderId(''); setSelectedMembers([]);
     setPersonalPercent('3'); setTeamPercent('1'); setEditTeamId(null);
@@ -52,10 +99,26 @@ export function TeamCommissionTab() {
 
   const handleSaveTeam = () => {
     if (!teamName.trim() || !leaderId) return;
-    const teamData = { name: teamName, leaderId, memberIds: [leaderId, ...selectedMembers.filter(id => id !== leaderId)], personalPercent: parseFloat(personalPercent) || 0, teamPercent: parseFloat(teamPercent) || 0 };
-    if (editTeamId) { updateTeam(editTeamId, teamData); }
-    else { addTeam(teamData); }
-    resetTeamForm(); setTeamDialogOpen(false);
+    const teamData = { 
+      name: teamName, 
+      leaderId, 
+      memberIds: [leaderId, ...selectedMembers.filter(id => id !== leaderId)], 
+      personalPercent: parseFloat(personalPercent) || 0, 
+      teamPercent: parseFloat(teamPercent) || 0 
+    };
+    if (editTeamId) { 
+      updateTeamMutation.mutate({ id: editTeamId, ...teamData }); 
+    } else { 
+      createTeamMutation.mutate(teamData); 
+    }
+    resetTeamForm(); 
+    setTeamDialogOpen(false);
+  };
+
+  const handleDeleteTeam = (id: string) => {
+    if (confirm('آیا از حذف اطمینان دارید؟')) {
+      deleteTeamMutation.mutate(id);
+    }
   };
 
   const handleEditTeam = (team: Team) => {
@@ -77,41 +140,52 @@ export function TeamCommissionTab() {
   const teamCalc = useMemo(() => {
     if (!selectedTeam || leaderSalesNum <= 0) return null;
     const personalCommission = leaderSalesNum * (selectedTeam.personalPercent / 100);
-
-    // Sum sales from all team members in current period
+  
     let totalTeamSales = leaderSalesNum;
     for (const memberId of selectedTeam.memberIds) {
       if (memberId === selectedTeam.leaderId) continue;
-      const memberSales = getPersonTotalSales(useCommissionStore.getState(), currentPeriod, memberId);
+      const memberSales = getPersonTotalSales(memberId);
       totalTeamSales += memberSales;
     }
-
+  
     const teamCommissionAmount = totalTeamSales * (selectedTeam.teamPercent / 100);
     const totalLeaderCommission = personalCommission + teamCommissionAmount;
-
+  
     return { personalCommission, totalTeamSales, teamCommissionAmount, totalLeaderCommission };
-  }, [selectedTeam, leaderSalesNum, currentPeriod, data]);
+  }, [selectedTeam, leaderSalesNum, percentageCommissions, tieredCommissions]);
 
   const handleAddCommission = () => {
     if (!selectedTeamId || !teamCalc || leaderSalesNum <= 0) return;
-    addTeamCommission(currentPeriod, {
+    createTeamCommissionMutation.mutate({
       teamId: selectedTeamId,
-      period: currentPeriod,
       leaderPersonalSales: leaderSalesNum,
       leaderPersonalCommission: teamCalc.personalCommission,
       totalTeamSales: teamCalc.totalTeamSales,
       teamCommissionAmount: teamCalc.teamCommissionAmount,
       totalLeaderCommission: teamCalc.totalLeaderCommission,
+      periodYear: currentPeriod.year,
+      periodMonth: currentPeriod.month,
     });
-    setSelectedTeamId(''); setLeaderSales('');
+    setSelectedTeamId(''); 
+    setLeaderSales('');
+  };
+
+  const handleDeleteTeamCommission = (id: string) => {
+    if (confirm('آیا از حذف اطمینان دارید؟')) {
+      deleteTeamCommissionMutation.mutate({
+        id,
+        year: currentPeriod.year,
+        month: currentPeriod.month,
+      });
+    }
   };
 
   const getPersonName = (id: string) => salesPersons.find(sp => sp.id === id)?.name || 'نامشخص';
 
-  const totalTeamComm = data.teamCommissions.reduce((s, tc) => s + tc.totalLeaderCommission, 0);
+  const totalTeamComm = teamCommissions.reduce((s, tc) => s + tc.totalLeaderCommission, 0);
 
   // Handle Excel import - Team definitions
-  const handleTeamImport = (rows: Record<string, string | number>[]) => {
+  const handleTeamImport = async (rows: Record<string, string | number>[]) => {
     for (const row of rows) {
       const teamName = String(row.teamName || '').trim();
       const leaderName = String(row.leaderName || '').trim();
@@ -126,9 +200,17 @@ export function TeamCommissionTab() {
       if (!leader) leader = salesPersons.find(sp => sp.code.trim() === leaderCode);
       let leaderId = leader?.id;
       if (!leaderId) {
-        useCommissionStore.getState().addSalesPerson(leaderName, leaderCode);
-        const state = useCommissionStore.getState();
-        leaderId = state.salesPersons.find(sp => sp.name.trim() === leaderName)?.id;
+        try {
+          const newPerson = await createSalesPersonMutation.mutateAsync({
+            name: leaderName,
+            code: leaderCode,
+          });
+          leaderId = newPerson.data.id;
+          salesPersons.push(newPerson.data);
+        } catch (err) {
+          console.error('خطا در ایجاد سرگروه:', err);
+          continue;
+        }
       }
 
       // Find or create members
@@ -144,51 +226,134 @@ export function TeamCommissionTab() {
           }
           let memberId = member?.id;
           if (!memberId) {
-            useCommissionStore.getState().addSalesPerson(mName, mName);
-            const st = useCommissionStore.getState();
-            memberId = st.salesPersons.find(sp => sp.name.trim() === mName)?.id;
+            try {
+              const newMember = await createSalesPersonMutation.mutateAsync({
+                name: mName,
+                code: mName,
+              });
+              memberId = newMember.data.id;
+              salesPersons.push(newMember.data);
+            } catch (err) {
+              console.error('خطا در ایجاد عضو:', err);
+              continue;
+            }
           }
           if (memberId && !memberIds.includes(memberId)) memberIds.push(memberId);
         }
       }
 
       if (leaderId) {
-        addTeam({ name: teamName, leaderId, memberIds, personalPercent, teamPercent });
+        await createTeamMutation.mutateAsync({
+          name: teamName,
+          leaderId,
+          memberIds,
+          personalPercent,
+          teamPercent,
+        });
       }
     }
   };
 
   // Handle Excel import - Team sales (commission records)
-  const handleTeamSalesImport = (rows: Record<string, string | number>[]) => {
+  const handleTeamSalesImport = async (rows: Record<string, string | number>[]) => {
+    let successCount = 0;
+    let errorCount = 0;
+  
     for (const row of rows) {
-      const teamName = String(row.teamName || '').trim();
-      const leaderSales = Number(row.leaderSales) || 0;
-      if (!teamName || leaderSales <= 0) continue;
-
-      const team = teams.find(t => t.name.trim() === teamName);
-      if (!team) continue;
-
-      const personalCommission = leaderSales * (team.personalPercent / 100);
-      let totalTeamSales = leaderSales;
-      for (const memberId of team.memberIds) {
-        if (memberId === team.leaderId) continue;
-        const memberSales = getPersonTotalSales(useCommissionStore.getState(), currentPeriod, memberId);
-        totalTeamSales += memberSales;
+      try {
+        const teamName = String(row.teamName || '').trim();
+        const leaderName = String(row.leaderName || '').trim();
+        const leaderCode = String(row.leaderCode || '').trim() || leaderName;
+        const memberNamesStr = String(row.memberNames || '').trim();
+        const personalPercent = Number(row.personalPercent) || 0;
+        const teamPercent = Number(row.teamPercent) || 0;
+        
+        if (!teamName || !leaderName) {
+          errorCount++;
+          continue;
+        }
+  
+        // Find or create leader
+        let leader = salesPersons.find(sp => sp.name.trim() === leaderName);
+        if (!leader) leader = salesPersons.find(sp => sp.code.trim() === leaderCode);
+        let leaderId = leader?.id;
+        
+        if (!leaderId) {
+          try {
+            const newPerson = await createSalesPersonMutation.mutateAsync({
+              name: leaderName,
+              code: leaderCode,
+            });
+            leaderId = newPerson.data.id;
+            salesPersons.push(newPerson.data);
+          } catch (err) {
+            console.error('خطا در ایجاد سرگروه:', err);
+            errorCount++;
+            continue;
+          }
+        }
+  
+        // Find or create members
+        const memberIds: string[] = [];
+        if (leaderId) memberIds.push(leaderId);
+        
+        if (memberNamesStr) {
+          const memberNames = memberNamesStr.split(/[,،]/).map(n => n.trim()).filter(Boolean);
+          for (const mName of memberNames) {
+            let member = salesPersons.find(sp => sp.name.trim() === mName);
+            let memberId = member?.id;
+            
+            if (!memberId) {
+              try {
+                const newMember = await createSalesPersonMutation.mutateAsync({
+                  name: mName,
+                  code: mName,
+                });
+                memberId = newMember.data.id;
+                salesPersons.push(newMember.data);
+              } catch (err) {
+                console.error('خطا در ایجاد عضو:', err);
+                errorCount++;
+                continue;
+              }
+            }
+            
+            if (memberId && !memberIds.includes(memberId)) {
+              memberIds.push(memberId);
+            }
+          }
+        }
+  
+        if (leaderId) {
+          await createTeamMutation.mutateAsync({
+            name: teamName,
+            leaderId,
+            memberIds,
+            personalPercent,
+            teamPercent,
+          });
+          successCount++;
+        }
+      } catch (err) {
+        console.error('خطا در پردازش ردیف:', err);
+        errorCount++;
       }
-      const teamCommissionAmount = totalTeamSales * (team.teamPercent / 100);
-      const totalLeaderCommission = personalCommission + teamCommissionAmount;
-
-      addTeamCommission(currentPeriod, {
-        teamId: team.id,
-        period: currentPeriod,
-        leaderPersonalSales: leaderSales,
-        leaderPersonalCommission: personalCommission,
-        totalTeamSales,
-        teamCommissionAmount,
-        totalLeaderCommission,
-      });
+    }
+  
+    // نمایش نتیجه
+    if (successCount > 0) {
+      toast.success(`${successCount} تیم با موفقیت ایجاد شد`);
+    }
+    if (errorCount > 0) {
+      toast.error(`${errorCount} ردیف با خطا مواجه شد`);
     }
   };
+
+  useEffect(() => {
+    if (selectedTeamId && leaderSales) {
+      // محاسبه مجدد خودکار انجام میشه چون teamCalc وابسته به percentageCommissions و tieredCommissions هست
+    }
+  }, [percentageCommissions, tieredCommissions]);
 
   return (
     <div className="space-y-6">
@@ -280,7 +445,8 @@ export function TeamCommissionTab() {
                       </div>
                       <div className="flex gap-1">
                         <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg hover:bg-indigo-50" onClick={() => handleEditTeam(team)}><Pencil className="h-3.5 w-3.5 text-indigo-500" /></Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg hover:bg-red-50" onClick={() => { if (confirm('آیا از حذف اطمینان دارید؟')) removeTeam(team.id); }}><Trash2 className="h-3.5 w-3.5 text-red-400" /></Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg hover:bg-red-50" 
+                        onClick={() => handleDeleteTeam(team.id)}><Trash2 className="h-3.5 w-3.5 text-red-400" /></Button>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 text-sm">
@@ -396,7 +562,7 @@ export function TeamCommissionTab() {
       )}
 
       {/* Summary */}
-      {data.teamCommissions.length > 0 && (
+      {teamCommissions.length > 0 && (
         <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-white rounded-2xl card-hover-lift shadow-sm">
           <CardContent className="pt-6">
             <p className="text-sm text-blue-600 font-semibold mb-1">مجموع پورسانت تیمی</p>
@@ -406,7 +572,7 @@ export function TeamCommissionTab() {
       )}
 
       {/* Table */}
-      {data.teamCommissions.length > 0 && (
+      {teamCommissions.length > 0 && (
         <Card className="rounded-2xl shadow-sm border overflow-hidden">
           <CardContent className="p-0">
             <div className="overflow-x-auto">
@@ -425,7 +591,7 @@ export function TeamCommissionTab() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.teamCommissions.map((tc, idx) => {
+                  {teamCommissions.map((tc, idx) => {
                     const team = teams.find(t => t.id === tc.teamId);
                     return (
                       <TableRow key={tc.id}>
@@ -437,7 +603,8 @@ export function TeamCommissionTab() {
                         <TableCell className="text-left font-mono tabular-nums text-blue-600" dir="ltr">{formatNumber(tc.leaderPersonalCommission)}</TableCell>
                         <TableCell className="text-left font-mono tabular-nums text-indigo-600" dir="ltr">{formatNumber(tc.teamCommissionAmount)}</TableCell>
                         <TableCell className="font-bold text-emerald-700 text-left font-mono tabular-nums" dir="ltr">{formatNumber(tc.totalLeaderCommission)}</TableCell>
-                        <TableCell><Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-red-50 active:scale-90" onClick={() => { if (confirm('آیا از حذف اطمینان دارید؟')) removeTeamCommission(currentPeriod, tc.id); }}><Trash2 className="h-4 w-4 text-red-400" /></Button></TableCell>
+                        <TableCell><Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-red-50 active:scale-90" 
+                       onClick={() => handleDeleteTeamCommission(tc.id)}><Trash2 className="h-4 w-4 text-red-400" /></Button></TableCell>
                       </TableRow>
                     );
                   })}

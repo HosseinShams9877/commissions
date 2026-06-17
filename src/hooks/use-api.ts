@@ -412,6 +412,17 @@ export function useDeleteTieredCommission() {
 }
 
 // ============================================================
+// Periods (لیست دوره‌های ذخیره شده) Hooks
+// ============================================================
+
+export function useSavedPeriods() {
+  return useQuery<{ success: boolean; data: CommissionPeriod[] }>({
+    queryKey: ['saved-periods'],
+    queryFn: () => apiClient.get<{ success: boolean; data: CommissionPeriod[] }>('/periods'),
+  });
+}
+
+// ============================================================
 // Finder Fee Hooks
 // ============================================================
 

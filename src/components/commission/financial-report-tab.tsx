@@ -6,6 +6,26 @@ import {
   formatCurrency, formatNumber, formatPercent, toPersianDigits,
   formatShamsiDate, getCurrentShamsiDate, cn, PERSIAN_MONTHS,
 } from '@/lib/utils';
+import { 
+  useSalesPersons, 
+  useTeams, 
+  usePercentageCommissions, 
+  useTieredCommissions, 
+  useFinderFees, 
+  useTestCosts, 
+  useRepairCosts, 
+  useSalesShares, 
+  useTeamCommissions, 
+  useBonusPenalties,
+  useCollections,
+  useSettlements,useCreateCollection,
+  useDeleteCollection,
+  useCreateSettlement,
+  useDeleteSettlement,
+  useCreateSalesPerson,
+  useSavedPeriods, 
+} from '@/hooks/use-api';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -43,20 +63,34 @@ type SubTab = 'collections' | 'settlements' | 'report';
 // ====== Helper: compute financial summary for a single MonthlyData ======
 function computePeriodFinancials(
   data: {
-    percentageCommissions: { salesPersonId: string; salesAmount: number; commissionAmount: number }[];
-    tieredCommissions: { salesPersonId: string; salesAmount: number; commissionAmount: number }[];
-    finderFees: { salesPersonId: string; amount: number }[];
-    salesShares: { salesPersonId: string; shareAmount: number }[];
-    teamCommissions: { teamId: string; totalLeaderCommission: number }[];
-    bonusPenalties: { salesPersonId: string; type: 'bonus' | 'penalty'; amount: number }[];
-    testCosts: { salesPersonId: string; amount: number }[];
-    repairCosts: { salesPersonId: string; amount: number }[];
-    collections: { salesPersonId: string; amount: number }[];
-    settlements: { salesPersonId: string; amount: number }[];
+    percentageCommissions: any[];
+    tieredCommissions: any[];
+    finderFees: any[];
+    salesShares: any[];
+    teamCommissions: any[];
+    bonusPenalties: any[];
+    testCosts: any[];
+    repairCosts: any[];
+    collections: any[];
+    settlements: any[];
   },
   teams: { id: string; leaderId: string }[],
-  salesPersonIds?: string[], // if provided, only compute for these IDs
+  salesPersonIds?: string[],
 ) {
+  // استخراج داده‌ها از data
+  const {
+    percentageCommissions,
+    tieredCommissions,
+    finderFees,
+    salesShares,
+    teamCommissions,
+    bonusPenalties,
+    testCosts,
+    repairCosts,
+    collections,
+    settlements,
+  } = data;
+
   const result: Record<string, {
     sales: number; collections: number; commissions: number;
     deductions: number; netPayable: number; settled: number; remaining: number;
@@ -67,57 +101,57 @@ function computePeriodFinancials(
   };
   const shouldInclude = (id: string) => !salesPersonIds || salesPersonIds.includes(id);
 
-  for (const pc of data.percentageCommissions) {
+  for (const pc of percentageCommissions) {
     if (!shouldInclude(pc.salesPersonId)) continue;
     init(pc.salesPersonId);
     result[pc.salesPersonId].sales += pc.salesAmount;
     result[pc.salesPersonId].commissions += pc.commissionAmount;
   }
-  for (const tc of data.tieredCommissions) {
+  for (const tc of tieredCommissions) {
     if (!shouldInclude(tc.salesPersonId)) continue;
     init(tc.salesPersonId);
     result[tc.salesPersonId].sales += tc.salesAmount;
     result[tc.salesPersonId].commissions += tc.commissionAmount;
   }
-  for (const ff of data.finderFees) {
+  for (const ff of finderFees) {
     if (!shouldInclude(ff.salesPersonId)) continue;
     init(ff.salesPersonId);
     result[ff.salesPersonId].commissions += ff.amount;
   }
-  for (const ss of data.salesShares) {
+  for (const ss of salesShares) {
     if (!shouldInclude(ss.salesPersonId)) continue;
     init(ss.salesPersonId);
     result[ss.salesPersonId].commissions += ss.shareAmount;
   }
-  for (const tc of data.teamCommissions) {
+  for (const tc of teamCommissions) {
     const team = teams.find(t => t.id === tc.teamId);
     if (team && shouldInclude(team.leaderId)) {
       init(team.leaderId);
       result[team.leaderId].commissions += tc.totalLeaderCommission;
     }
   }
-  for (const bp of data.bonusPenalties) {
+  for (const bp of bonusPenalties) {
     if (!shouldInclude(bp.salesPersonId)) continue;
     init(bp.salesPersonId);
     if (bp.type === 'bonus') result[bp.salesPersonId].commissions += bp.amount;
     else result[bp.salesPersonId].deductions += bp.amount;
   }
-  for (const tc of data.testCosts) {
+  for (const tc of testCosts) {
     if (!shouldInclude(tc.salesPersonId)) continue;
     init(tc.salesPersonId);
     result[tc.salesPersonId].deductions += tc.amount;
   }
-  for (const rc of data.repairCosts) {
+  for (const rc of repairCosts) {
     if (!shouldInclude(rc.salesPersonId)) continue;
     init(rc.salesPersonId);
     result[rc.salesPersonId].deductions += rc.amount;
   }
-  for (const c of data.collections) {
+  for (const c of collections) {
     if (!shouldInclude(c.salesPersonId)) continue;
     init(c.salesPersonId);
     result[c.salesPersonId].collections += c.amount;
   }
-  for (const st of data.settlements) {
+  for (const st of settlements) {
     if (!shouldInclude(st.salesPersonId)) continue;
     init(st.salesPersonId);
     result[st.salesPersonId].settled += st.amount;
@@ -132,13 +166,35 @@ function computePeriodFinancials(
 }
 
 export function FinancialReportTab() {
-  const {
-    salesPersons, teams, currentPeriod, getMonthlyData,
-    addCollection, removeCollection, addSettlement, removeSettlement,
-    addSalesPerson, getSavedPeriods,
-  } = useCommissionStore();
-
-  const data = getMonthlyData(currentPeriod);
+  const { currentPeriod } = useCommissionStore();
+  
+  // گرفتن همه داده‌ها از API
+  const { data: salesPersonsData } = useSalesPersons();
+  const { data: teamsData } = useTeams();
+  const { data: percentageData } = usePercentageCommissions(currentPeriod.year, currentPeriod.month);
+  const { data: tieredData } = useTieredCommissions(currentPeriod.year, currentPeriod.month);
+  const { data: finderFeeData } = useFinderFees(currentPeriod.year, currentPeriod.month);
+  const { data: testCostData } = useTestCosts(currentPeriod.year, currentPeriod.month);
+  const { data: repairCostData } = useRepairCosts(currentPeriod.year, currentPeriod.month);
+  const { data: salesShareData } = useSalesShares(currentPeriod.year, currentPeriod.month);
+  const { data: teamCommissionData } = useTeamCommissions(currentPeriod.year, currentPeriod.month);
+  const { data: bonusPenaltyData } = useBonusPenalties(currentPeriod.year, currentPeriod.month);
+  const { data: collectionData } = useCollections(currentPeriod.year, currentPeriod.month);
+  const { data: settlementData } = useSettlements(currentPeriod.year, currentPeriod.month);
+  
+  // داده‌های محلی
+  const salesPersons = salesPersonsData?.salesPersons || [];
+  const teams = teamsData?.teams || [];
+  const percentageCommissions = percentageData?.percentageCommissions || [];
+  const tieredCommissions = tieredData?.tieredCommissions || [];
+  const finderFees = finderFeeData?.finderFees || [];
+  const testCosts = testCostData?.testCosts || [];
+  const repairCosts = repairCostData?.repairCosts || [];
+  const salesShares = salesShareData?.salesShares || [];
+  const teamCommissions = teamCommissionData?.teamCommissions || [];
+  const bonusPenalties = bonusPenaltyData?.bonusPenalties || [];
+  const collections = collectionData?.collections || [];
+  const settlements = settlementData?.settlements || [];
   const [subTab, setSubTab] = useState<SubTab>('report');
 
   // ====== Filter state ======
@@ -164,7 +220,8 @@ export function FinancialReportTab() {
   const getPersonName = (id: string) => salesPersons.find(sp => sp.id === id)?.name || 'نامشخص';
 
   // ====== Available years from data ======
-  const savedPeriods = getSavedPeriods();
+ const { data: savedPeriodsData } = useSavedPeriods();
+const savedPeriods = savedPeriodsData?.data || [currentPeriod];
   const allYears = useMemo(() => {
     const yearSet = new Set<number>();
     savedPeriods.forEach(p => { yearSet.add(p.year); });
@@ -222,7 +279,18 @@ export function FinancialReportTab() {
     }> = {};
 
     for (const period of filteredPeriods) {
-      const pData = getMonthlyData(period);
+      const pData = {
+  percentageCommissions,
+  tieredCommissions,
+  finderFees,
+  testCosts,
+  repairCosts,
+  salesShares,
+  teamCommissions,
+  bonusPenalties,
+  collections,
+  settlements,
+};
       const periodResult = computePeriodFinancials(pData, teams, filteredPersonIds);
 
       for (const [id, vals] of Object.entries(periodResult)) {
@@ -243,12 +311,24 @@ export function FinancialReportTab() {
       p.remaining = p.netPayable - p.settled;
     }
     return combined;
-  }, [filteredPeriods, teams, filteredPersonIds, getMonthlyData]);
+  }, [filteredPeriods, teams, filteredPersonIds, percentageCommissions, tieredCommissions, finderFees, testCosts, repairCosts, salesShares, teamCommissions, bonusPenalties, collections, settlements]);
 
   // ====== Current period financials (for collections/settlements tabs) ======
-  const currentPeriodFinancials = useMemo(() => {
-    return computePeriodFinancials(data, teams);
-  }, [data, teams]);
+ const currentPeriodFinancials = useMemo(() => {
+  const dataForPeriod = {
+    percentageCommissions,
+    tieredCommissions,
+    finderFees,
+    testCosts,
+    repairCosts,
+    salesShares,
+    teamCommissions,
+    bonusPenalties,
+    collections,
+    settlements,
+  };
+  return computePeriodFinancials(dataForPeriod, teams);
+}, [percentageCommissions, tieredCommissions, finderFees, testCosts, repairCosts, salesShares, teamCommissions, bonusPenalties, collections, settlements, teams]);
 
   // ====== Totals from aggregated data ======
   const totalSales = Object.values(aggregatedFinancials).reduce((s, p) => s + p.sales, 0);
@@ -260,38 +340,49 @@ export function FinancialReportTab() {
   const remainingDebt = netPayable - totalSettlements;
 
   // Current period totals for collections/settlements sub-tabs
-  const curTotalSales = data.percentageCommissions.reduce((s, pc) => s + pc.salesAmount, 0)
-    + data.tieredCommissions.reduce((s, tc) => s + tc.salesAmount, 0);
-  const curTotalCollections = data.collections.reduce((s, c) => s + c.amount, 0);
-  const curTotalSettlements = data.settlements.reduce((s, st) => s + st.amount, 0);
-  const curTotalComm = data.percentageCommissions.reduce((s, pc) => s + pc.commissionAmount, 0)
-    + data.tieredCommissions.reduce((s, tc) => s + tc.commissionAmount, 0)
-    + data.finderFees.reduce((s, ff) => s + ff.amount, 0)
-    + data.salesShares.reduce((s, ss) => s + ss.shareAmount, 0)
-    + data.teamCommissions.reduce((s, tc) => s + tc.totalLeaderCommission, 0)
-    + data.bonusPenalties.filter(bp => bp.type === 'bonus').reduce((s, bp) => s + bp.amount, 0);
-  const curTotalDed = data.testCosts.reduce((s, tc) => s + tc.amount, 0)
-    + data.repairCosts.reduce((s, rc) => s + rc.amount, 0)
-    + data.bonusPenalties.filter(bp => bp.type === 'penalty').reduce((s, bp) => s + bp.amount, 0);
+  const curTotalSales = percentageCommissions.reduce((s, pc) => s + pc.salesAmount, 0)
+    + tieredCommissions.reduce((s, tc) => s + tc.salesAmount, 0);
+  const curTotalCollections = collections.reduce((s, c) => s + c.amount, 0);
+  const curTotalSettlements = settlements.reduce((s, st) => s + st.amount, 0);
+  const curTotalComm = percentageCommissions.reduce((s, pc) => s + pc.commissionAmount, 0)
+    + tieredCommissions.reduce((s, tc) => s + tc.commissionAmount, 0)
+    + finderFees.reduce((s, ff) => s + ff.amount, 0)
+    + salesShares.reduce((s, ss) => s + ss.shareAmount, 0)
+    + teamCommissions.reduce((s, tc) => s + tc.totalLeaderCommission, 0)
+    + bonusPenalties.filter(bp => bp.type === 'bonus').reduce((s, bp) => s + bp.amount, 0);
+  const curTotalDed = testCosts.reduce((s, tc) => s + tc.amount, 0)
+    + repairCosts.reduce((s, rc) => s + rc.amount, 0)
+    + bonusPenalties.filter(bp => bp.type === 'penalty').reduce((s, bp) => s + bp.amount, 0);
   const curNetPayable = curTotalComm - curTotalDed;
   const curRemaining = curNetPayable - curTotalSettlements;
 
   // Breakdown for current period report (if no multi-period filter)
-  const totalPercentageComm = isMultiPeriod ? 0 : data.percentageCommissions.reduce((s, pc) => s + pc.commissionAmount, 0);
-  const totalTieredComm = isMultiPeriod ? 0 : data.tieredCommissions.reduce((s, tc) => s + tc.commissionAmount, 0);
-  const totalFinderFee = isMultiPeriod ? 0 : data.finderFees.reduce((s, ff) => s + ff.amount, 0);
-  const totalSalesShare = isMultiPeriod ? 0 : data.salesShares.reduce((s, ss) => s + ss.shareAmount, 0);
-  const totalTeamComm = isMultiPeriod ? 0 : data.teamCommissions.reduce((s, tc) => s + tc.totalLeaderCommission, 0);
-  const totalBonus = isMultiPeriod ? 0 : data.bonusPenalties.filter(bp => bp.type === 'bonus').reduce((s, bp) => s + bp.amount, 0);
-  const totalPenalty = isMultiPeriod ? 0 : data.bonusPenalties.filter(bp => bp.type === 'penalty').reduce((s, bp) => s + bp.amount, 0);
-  const totalTestCost = isMultiPeriod ? 0 : data.testCosts.reduce((s, tc) => s + tc.amount, 0);
-  const totalRepairCost = isMultiPeriod ? 0 : data.repairCosts.reduce((s, rc) => s + rc.amount, 0);
+  const totalPercentageComm = isMultiPeriod ? 0 : percentageCommissions.reduce((s, pc) => s + pc.commissionAmount, 0);
+  const totalTieredComm = isMultiPeriod ? 0 : tieredCommissions.reduce((s, tc) => s + tc.commissionAmount, 0);
+  const totalFinderFee = isMultiPeriod ? 0 : finderFees.reduce((s, ff) => s + ff.amount, 0);
+  const totalSalesShare = isMultiPeriod ? 0 : salesShares.reduce((s, ss) => s + ss.shareAmount, 0);
+  const totalTeamComm = isMultiPeriod ? 0 : teamCommissions.reduce((s, tc) => s + tc.totalLeaderCommission, 0);
+  const totalBonus = isMultiPeriod ? 0 : bonusPenalties.filter(bp => bp.type === 'bonus').reduce((s, bp) => s + bp.amount, 0);
+  const totalPenalty = isMultiPeriod ? 0 : bonusPenalties.filter(bp => bp.type === 'penalty').reduce((s, bp) => s + bp.amount, 0);
+  const totalTestCost = isMultiPeriod ? 0 : testCosts.reduce((s, tc) => s + tc.amount, 0);
+  const totalRepairCost = isMultiPeriod ? 0 : repairCosts.reduce((s, rc) => s + rc.amount, 0);
 
   // ====== Multi-month data for comparison table ======
   const [showMultiMonth, setShowMultiMonth] = useState(false);
 
   const multiMonthData = savedPeriods.map(period => {
-    const pData = getMonthlyData(period);
+  const pData = {
+    percentageCommissions,
+    tieredCommissions,
+    finderFees,
+    testCosts,
+    repairCosts,
+    salesShares,
+    teamCommissions,
+    bonusPenalties,
+    collections,
+    settlements,
+  };
     const pf = computePeriodFinancials(pData, teams, filteredPersonIds);
     const pSales = Object.values(pf).reduce((s, p) => s + p.sales, 0);
     const pColl = Object.values(pf).reduce((s, p) => s + p.collections, 0);
@@ -303,67 +394,177 @@ export function FinancialReportTab() {
   });
 
   // ====== Handlers ======
-  const handleAddCollection = () => {
-    if (!collPersonId || !collAmount) return;
-    addCollection(currentPeriod, {
-      salesPersonId: collPersonId,
-      amount: parseFloat(collAmount),
-      date: collDate || toPersianDigits(getCurrentShamsiDate().year + '/' + getCurrentShamsiDate().month + '/' + getCurrentShamsiDate().day),
-      description: collDesc || 'وصولی',
-    });
-    setCollPersonId(''); setCollAmount(''); setCollDate(''); setCollDesc('');
-  };
+  const createCollectionMutation = useCreateCollection();
 
-  const handleAddSettlement = () => {
-    if (!settlePersonId || !settleAmount) return;
-    addSettlement(currentPeriod, {
-      salesPersonId: settlePersonId,
-      amount: parseFloat(settleAmount),
-      date: settleDate || toPersianDigits(getCurrentShamsiDate().year + '/' + getCurrentShamsiDate().month + '/' + getCurrentShamsiDate().day),
-      description: settleDesc || 'تسویه حساب',
-    });
-    setSettlePersonId(''); setSettleAmount(''); setSettleDate(''); setSettleDesc('');
-  };
+const handleAddCollection = () => {
+  if (!collPersonId || !collAmount) return;
+  createCollectionMutation.mutate({
+    salesPersonId: collPersonId,
+    amount: parseFloat(collAmount),
+    date: collDate || toPersianDigits(getCurrentShamsiDate().year + '/' + getCurrentShamsiDate().month + '/' + getCurrentShamsiDate().day),
+    description: collDesc || 'وصولی',
+    periodYear: currentPeriod.year,
+    periodMonth: currentPeriod.month,
+  });
+  setCollPersonId(''); setCollAmount(''); setCollDate(''); setCollDesc('');
+};
 
-  const handleCollectionExcelImport = (rows: Record<string, string | number>[]) => {
-    for (const row of rows) {
+const createSettlementMutation = useCreateSettlement();
+
+const handleAddSettlement = () => {
+  if (!settlePersonId || !settleAmount) return;
+  createSettlementMutation.mutate({
+    salesPersonId: settlePersonId,
+    amount: parseFloat(settleAmount),
+    date: settleDate || toPersianDigits(getCurrentShamsiDate().year + '/' + getCurrentShamsiDate().month + '/' + getCurrentShamsiDate().day),
+    description: settleDesc || 'تسویه حساب',
+    periodYear: currentPeriod.year,
+    periodMonth: currentPeriod.month,
+  });
+  setSettlePersonId(''); setSettleAmount(''); setSettleDate(''); setSettleDesc('');
+};
+
+const deleteCollectionMutation = useDeleteCollection();
+const deleteSettlementMutation = useDeleteSettlement();
+const createSalesPersonMutation = useCreateSalesPerson();
+
+  const handleCollectionExcelImport = async (rows: Record<string, string | number>[]) => {
+  let successCount = 0;
+  let errorCount = 0;
+
+  for (const row of rows) {
+    try {
       const name = String(row.name || '').trim();
       const code = String(row.code || '').trim() || name;
       const amount = Number(row.amount) || 0;
-      if (!name || amount <= 0) continue;
+      
+      if (!name || amount <= 0) {
+        errorCount++;
+        continue;
+      }
+
+      // پیدا کردن فروشنده موجود
       let person = salesPersons.find(sp => sp.name.trim() === name);
       if (!person) person = salesPersons.find(sp => sp.code.trim() === code);
       let personId = person?.id;
-      if (!personId) {
-        addSalesPerson(name, code);
-        const state = useCommissionStore.getState();
-        personId = state.salesPersons.find(sp => sp.name.trim() === name)?.id;
-      }
-      if (personId) {
-        addCollection(currentPeriod, { salesPersonId: personId, amount, date: String(row.date || ''), description: String(row.description || 'وصولی از اکسل') });
-      }
-    }
-  };
 
-  const handleSettlementExcelImport = (rows: Record<string, string | number>[]) => {
-    for (const row of rows) {
+      // اگر فروشنده وجود نداشت، ایجاد کن
+      if (!personId) {
+        try {
+          const newPerson = await createSalesPersonMutation.mutateAsync({
+            name,
+            code,
+          });
+          personId = newPerson.data.id;
+          
+          // به لیست محلی اضافه کن تا دفعه بعد پیدا بشه
+          salesPersons.push(newPerson.data);
+        } catch (err) {
+          console.error('خطا در ایجاد فروشنده:', err);
+          errorCount++;
+          continue;
+        }
+      }
+
+      // ثبت وصول
+      if (personId) {
+        try {
+          await createCollectionMutation.mutateAsync({
+            salesPersonId: personId,
+            amount,
+            date: String(row.date || ''),
+            description: String(row.description || 'وصولی از اکسل'),
+            periodYear: currentPeriod.year,
+            periodMonth: currentPeriod.month,
+          });
+          successCount++;
+        } catch (err) {
+          console.error('خطا در ثبت وصول:', err);
+          errorCount++;
+        }
+      }
+    } catch (err) {
+      console.error('خطا در پردازش ردیف:', err);
+      errorCount++;
+    }
+  }
+
+  // نمایش نتیجه
+  if (successCount > 0) {
+    toast.success(`${successCount} وصول با موفقیت ثبت شد`);
+  }
+  if (errorCount > 0) {
+    toast.error(`${errorCount} ردیف با خطا مواجه شد`);
+  }
+};
+
+  const handleSettlementExcelImport = async (rows: Record<string, string | number>[]) => {
+  let successCount = 0;
+  let errorCount = 0;
+
+  for (const row of rows) {
+    try {
       const name = String(row.name || '').trim();
       const code = String(row.code || '').trim() || name;
       const amount = Number(row.amount) || 0;
-      if (!name || amount <= 0) continue;
+      
+      if (!name || amount <= 0) {
+        errorCount++;
+        continue;
+      }
+
+      // پیدا کردن فروشنده موجود
       let person = salesPersons.find(sp => sp.name.trim() === name);
       if (!person) person = salesPersons.find(sp => sp.code.trim() === code);
       let personId = person?.id;
+
+      // اگر فروشنده وجود نداشت، ایجاد کن
       if (!personId) {
-        addSalesPerson(name, code);
-        const state = useCommissionStore.getState();
-        personId = state.salesPersons.find(sp => sp.name.trim() === name)?.id;
+        try {
+          const newPerson = await createSalesPersonMutation.mutateAsync({
+            name,
+            code,
+          });
+          personId = newPerson.data.id;
+          salesPersons.push(newPerson.data);
+        } catch (err) {
+          console.error('خطا در ایجاد فروشنده:', err);
+          errorCount++;
+          continue;
+        }
       }
+
+      // ثبت تسویه
       if (personId) {
-        addSettlement(currentPeriod, { salesPersonId: personId, amount, date: String(row.date || ''), description: String(row.description || 'تسویه از اکسل') });
+        try {
+          await createSettlementMutation.mutateAsync({
+            salesPersonId: personId,
+            amount,
+            date: String(row.date || ''),
+            description: String(row.description || 'تسویه از اکسل'),
+            periodYear: currentPeriod.year,
+            periodMonth: currentPeriod.month,
+          });
+          successCount++;
+        } catch (err) {
+          console.error('خطا در ثبت تسویه:', err);
+          errorCount++;
+        }
       }
+    } catch (err) {
+      console.error('خطا در پردازش ردیف:', err);
+      errorCount++;
     }
-  };
+  }
+
+  // نمایش نتیجه
+  if (successCount > 0) {
+    toast.success(`${successCount} تسویه با موفقیت ثبت شد`);
+  }
+  if (errorCount > 0) {
+    toast.error(`${errorCount} ردیف با خطا مواجه شد`);
+  }
+};
 
   const subTabs: { id: SubTab; label: string; icon: typeof FileBarChart }[] = [
     { id: 'report', label: 'گزارش مالی', icon: FileBarChart },
@@ -928,7 +1129,7 @@ export function FinancialReportTab() {
           </Card>
 
           {/* Summary cards */}
-          {data.collections.length > 0 && (
+          {collections.length > 0 && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Card className="border-teal-200 bg-gradient-to-br from-teal-50 to-white rounded-2xl card-hover-lift shadow-sm">
                 <CardContent className="pt-6">
@@ -948,7 +1149,7 @@ export function FinancialReportTab() {
           )}
 
           {/* Collections table */}
-          {data.collections.length > 0 && (
+          {collections.length > 0 && (
             <Card className="rounded-2xl shadow-sm border overflow-hidden">
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
@@ -964,7 +1165,7 @@ export function FinancialReportTab() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {data.collections.map((c, idx) => (
+                      {collections.map((c, idx) => (
                         <TableRow key={c.id} className="transition-all duration-150">
                           <TableCell className="text-muted-foreground text-xs">{toPersianDigits(idx + 1)}</TableCell>
                           <TableCell>
@@ -979,9 +1180,9 @@ export function FinancialReportTab() {
                           <TableCell className="text-xs text-muted-foreground">{c.date || '−'}</TableCell>
                           <TableCell className="text-xs text-muted-foreground">{c.description || '−'}</TableCell>
                           <TableCell>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-red-50 hover:text-red-600 active:scale-90 transition-all" onClick={() => { if (confirm('آیا از حذف اطمینان دارید؟')) removeCollection(currentPeriod, c.id); }}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-red-50 hover:text-red-600 active:scale-90 transition-all" onClick={() => { if (confirm('آیا از حذف اطمینان دارید؟')) { deleteCollectionMutation.mutate({ id: c.id, year: currentPeriod.year, month: currentPeriod.month }); } }}>
+  <Trash2 className="h-4 w-4" />
+</Button>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -992,7 +1193,7 @@ export function FinancialReportTab() {
             </Card>
           )}
 
-          {data.collections.length === 0 && (
+          {collections.length === 0 && (
             <Card className="rounded-2xl border-2 border-dashed border-teal-200 bg-teal-50/30">
               <CardContent className="py-12">
                 <div className="text-center text-muted-foreground">
@@ -1055,7 +1256,7 @@ export function FinancialReportTab() {
           </Card>
 
           {/* Summary cards */}
-          {data.settlements.length > 0 && (
+          {settlements.length > 0 && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Card className="border-amber-200 bg-gradient-to-br from-amber-50 to-white rounded-2xl card-hover-lift shadow-sm">
                 <CardContent className="pt-6">
@@ -1082,7 +1283,7 @@ export function FinancialReportTab() {
           )}
 
           {/* Settlements table */}
-          {data.settlements.length > 0 && (
+          {settlements.length > 0 && (
             <Card className="rounded-2xl shadow-sm border overflow-hidden">
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
@@ -1098,7 +1299,7 @@ export function FinancialReportTab() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {data.settlements.map((st, idx) => (
+                      {settlements.map((st, idx) => (
                         <TableRow key={st.id} className="transition-all duration-150">
                           <TableCell className="text-muted-foreground text-xs">{toPersianDigits(idx + 1)}</TableCell>
                           <TableCell>
@@ -1113,9 +1314,9 @@ export function FinancialReportTab() {
                           <TableCell className="text-xs text-muted-foreground">{st.date || '−'}</TableCell>
                           <TableCell className="text-xs text-muted-foreground">{st.description || '−'}</TableCell>
                           <TableCell>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-red-50 hover:text-red-600 active:scale-90 transition-all" onClick={() => { if (confirm('آیا از حذف اطمینان دارید؟')) removeSettlement(currentPeriod, st.id); }}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-red-50 hover:text-red-600 active:scale-90 transition-all" onClick={() => { if (confirm('آیا از حذف اطمینان دارید؟')) { deleteSettlementMutation.mutate({ id: st.id, year: currentPeriod.year, month: currentPeriod.month }); } }}>
+  <Trash2 className="h-4 w-4" />
+</Button>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -1126,7 +1327,7 @@ export function FinancialReportTab() {
             </Card>
           )}
 
-          {data.settlements.length === 0 && (
+          {settlements.length === 0 && (
             <Card className="rounded-2xl border-2 border-dashed border-amber-200 bg-amber-50/30">
               <CardContent className="py-12">
                 <div className="text-center text-muted-foreground">

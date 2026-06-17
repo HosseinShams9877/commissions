@@ -10,6 +10,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Percent, Trash2, Plus } from 'lucide-react';
 import { ExcelImport, ImportColumn } from './excel-import';
+import { 
+  useSalesPersons,
+  usePercentageCommissions, 
+  useCreatePercentageCommission, 
+  useDeletePercentageCommission,
+  useCreateSalesPerson,
+} from '@/hooks/use-api';
+import { toast } from 'sonner';
 
 const PERCENTAGE_IMPORT_COLUMNS: ImportColumn[] = [
   { key: 'name', label: 'نام فروشنده', required: true, type: 'string' },
@@ -19,8 +27,20 @@ const PERCENTAGE_IMPORT_COLUMNS: ImportColumn[] = [
 ];
 
 export function PercentageCommissionTab() {
-  const { salesPersons, currentPeriod, getMonthlyData, addPercentageCommission, removePercentageCommission, addSalesPerson } = useCommissionStore();
-  const data = getMonthlyData(currentPeriod);
+  const { currentPeriod } = useCommissionStore();
+  
+  // گرفتن داده‌ها از API
+  const { data: salesPersonsData } = useSalesPersons();
+  const { data: percentageData } = usePercentageCommissions(currentPeriod.year, currentPeriod.month);
+  
+  // Mutations
+  const createPercentageMutation = useCreatePercentageCommission();
+  const deletePercentageMutation = useDeletePercentageCommission();
+  const createSalesPersonMutation = useCreateSalesPerson();
+  
+  // داده‌های محلی
+  const salesPersons = salesPersonsData?.salesPersons || [];
+  const percentageCommissions = percentageData?.percentageCommissions || [];
 
   const [salesPersonId, setSalesPersonId] = useState('');
   const [salesAmount, setSalesAmount] = useState('');
@@ -36,42 +56,95 @@ export function PercentageCommissionTab() {
   };
 
   const handleAdd = () => {
-    if (!salesPersonId || !salesAmount || !percentage) return;
-    addPercentageCommission(currentPeriod, { salesPersonId, salesAmount: parseFloat(salesAmount), percentage: parseFloat(percentage) });
-    setSalesPersonId(''); setSalesAmount(''); setPercentage('');
-  };
+  if (!salesPersonId || !salesAmount || !percentage) return;
+  createPercentageMutation.mutate({
+    salesPersonId,
+    salesAmount: parseFloat(salesAmount),
+    percentage: parseFloat(percentage),
+    periodYear: currentPeriod.year,
+    periodMonth: currentPeriod.month,
+  });
+  setSalesPersonId(''); setSalesAmount(''); setPercentage('');
+};
+const handleDelete = (id: string) => {
+  if (confirm('آیا از حذف اطمینان دارید؟')) {
+    deletePercentageMutation.mutate({
+      id,
+      year: currentPeriod.year,
+      month: currentPeriod.month,
+    });
+  }
+};
+
 
   // Handle Excel import
-  const handleExcelImport = (rows: Record<string, string | number>[]) => {
-    for (const row of rows) {
+  const handleExcelImport = async (rows: Record<string, string | number>[]) => {
+  let successCount = 0;
+  let errorCount = 0;
+
+  for (const row of rows) {
+    try {
       const name = String(row.name || '').trim();
       const code = String(row.code || '').trim() || name;
       const salesAmount = Number(row.salesAmount) || 0;
       const percentage = Number(row.percentage) || 0;
-      if (!name || salesAmount <= 0 || percentage <= 0) continue;
+      
+      if (!name || salesAmount <= 0 || percentage <= 0) {
+        errorCount++;
+        continue;
+      }
 
-      // Find or create sales person by name
       let person = salesPersons.find(sp => sp.name.trim() === name);
-      if (!person) {
-        // Check by code
-        person = salesPersons.find(sp => sp.code.trim() === code);
-      }
+      if (!person) person = salesPersons.find(sp => sp.code.trim() === code);
       let personId = person?.id;
+
       if (!personId) {
-        addSalesPerson(name, code);
-        // Get newly added person from store
-        const state = useCommissionStore.getState();
-        personId = state.salesPersons.find(sp => sp.name.trim() === name)?.id;
+        try {
+          const newPerson = await createSalesPersonMutation.mutateAsync({
+            name,
+            code,
+          });
+          personId = newPerson.data.id;
+          salesPersons.push(newPerson.data);
+        } catch (err) {
+          console.error('خطا در ایجاد فروشنده:', err);
+          errorCount++;
+          continue;
+        }
       }
+
       if (personId) {
-        addPercentageCommission(currentPeriod, { salesPersonId: personId, salesAmount, percentage });
+        try {
+          await createPercentageMutation.mutateAsync({
+            salesPersonId: personId,
+            salesAmount,
+            percentage,
+            periodYear: currentPeriod.year,
+            periodMonth: currentPeriod.month,
+          });
+          successCount++;
+        } catch (err) {
+          console.error('خطا در ثبت پورسانت درصدی:', err);
+          errorCount++;
+        }
       }
+    } catch (err) {
+      console.error('خطا در پردازش ردیف:', err);
+      errorCount++;
     }
-  };
+  }
+
+  if (successCount > 0) {
+    toast.success(`${successCount} پورسانت درصدی با موفقیت ثبت شد`);
+  }
+  if (errorCount > 0) {
+    toast.error(`${errorCount} ردیف با خطا مواجه شد`);
+  }
+};
 
   const getSalesPersonName = (id: string) => salesPersons.find((sp) => sp.id === id)?.name || 'نامشخص';
-  const totalCommission = data.percentageCommissions.reduce((sum, pc) => sum + pc.commissionAmount, 0);
-  const totalSales = data.percentageCommissions.reduce((sum, pc) => sum + pc.salesAmount, 0);
+  const totalCommission = percentageCommissions.reduce((sum, pc) => sum + pc.commissionAmount, 0);
+  const totalSales = percentageCommissions.reduce((sum, pc) => sum + pc.salesAmount, 0);
 
   return (
     <div className="space-y-6">
@@ -116,7 +189,7 @@ export function PercentageCommissionTab() {
         </CardContent>
       </Card>
 
-      {data.percentageCommissions.length > 0 && (
+      {percentageCommissions.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Card className="border-emerald-200 bg-gradient-to-br from-emerald-50 to-white rounded-2xl card-hover-lift shadow-sm">
             <CardContent className="pt-6">
@@ -133,7 +206,7 @@ export function PercentageCommissionTab() {
         </div>
       )}
 
-      {data.percentageCommissions.length > 0 && (
+      {percentageCommissions.length > 0 && (
         <Card className="rounded-2xl shadow-sm border overflow-hidden">
           <CardContent className="p-0">
             <div className="overflow-x-auto">
@@ -149,7 +222,7 @@ export function PercentageCommissionTab() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.percentageCommissions.map((pc, idx) => (
+                  {percentageCommissions.map((pc, idx) => (
                     <TableRow key={pc.id} className="transition-all duration-150">
                       <TableCell className="text-muted-foreground text-xs">{toPersianDigits(idx + 1)}</TableCell>
                       <TableCell>
@@ -164,7 +237,8 @@ export function PercentageCommissionTab() {
                       <TableCell>{formatPercent(pc.percentage)}</TableCell>
                       <TableCell className="font-bold text-emerald-700 text-left font-mono tabular-nums" dir="ltr">{formatNumber(pc.commissionAmount)}</TableCell>
                       <TableCell>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-red-50 hover:text-red-600 active:scale-90 transition-all" onClick={() => { if (confirm('آیا از حذف اطمینان دارید؟')) removePercentageCommission(currentPeriod, pc.id); }}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-red-50 hover:text-red-600 active:scale-90 transition-all"
+                         onClick={() => handleDelete(pc.id)}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </TableCell>

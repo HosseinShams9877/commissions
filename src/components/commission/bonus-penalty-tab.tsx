@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useCommissionStore } from '@/lib/store';
 import { formatCurrency, formatNumber, toPersianDigits, cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { useBonusPenalties, useCreateBonusPenalty, useDeleteBonusPenalty, useSalesPersons  } from '@/hooks/use-api'
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -12,8 +13,25 @@ import { Badge } from '@/components/ui/badge';
 import { Gift, AlertTriangle, Trash2, Plus, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
 
 export function BonusPenaltyTab() {
-  const { salesPersons, currentPeriod, getMonthlyData, addBonusPenalty, removeBonusPenalty } = useCommissionStore();
-  const data = getMonthlyData(currentPeriod);
+
+    const { currentPeriod } = useCommissionStore();
+    
+    // گرفتن فروشندگان از API
+    const { data: salesPersonsData } = useSalesPersons();
+    const salesPersons = salesPersonsData?.salesPersons || [];
+    
+    // گرفتن داده‌ها از API
+    const { data, isLoading, isError } = useBonusPenalties(
+    currentPeriod.year,
+    currentPeriod.month
+  );
+  
+  // Mutations
+  const createMutation = useCreateBonusPenalty();
+  const deleteMutation = useDeleteBonusPenalty();
+  
+  // داده‌های محلی از API
+  const bonusPenalties = data?.bonusPenalties || [];
 
   const [salesPersonId, setSalesPersonId] = useState('');
   const [type, setType] = useState<'bonus' | 'penalty'>('bonus');
@@ -21,15 +39,34 @@ export function BonusPenaltyTab() {
   const [reason, setReason] = useState('');
 
   const handleAdd = () => {
-    if (!salesPersonId || !amount) return;
-    addBonusPenalty(currentPeriod, { salesPersonId, type, amount: parseFloat(amount), reason: reason || (type === 'bonus' ? 'پاداش' : 'جریمه') });
-    setSalesPersonId(''); setAmount(''); setReason(''); setType('bonus');
-  };
+  if (!salesPersonId || !amount) return;
+  createMutation.mutate({
+    salesPersonId,
+    type,
+    amount: parseFloat(amount),
+    reason: reason || (type === 'bonus' ? 'پاداش' : 'جریمه'),
+    periodYear: currentPeriod.year,
+    periodMonth: currentPeriod.month,
+  });
+  setSalesPersonId('');
+  setAmount('');
+  setReason('');
+  setType('bonus');
+};
 
+const handleDelete = (id: string) => {
+  if (confirm('آیا از حذف اطمینان دارید؟')) {
+    deleteMutation.mutate({
+      id,
+      year: currentPeriod.year,
+      month: currentPeriod.month,
+    });
+  }
+};
   const getPersonName = (id: string) => salesPersons.find(sp => sp.id === id)?.name || 'نامشخص';
 
-  const totalBonus = data.bonusPenalties.filter(bp => bp.type === 'bonus').reduce((s, bp) => s + bp.amount, 0);
-  const totalPenalty = data.bonusPenalties.filter(bp => bp.type === 'penalty').reduce((s, bp) => s + bp.amount, 0);
+  const totalBonus = bonusPenalties.filter(bp => bp.type === 'bonus').reduce((s, bp) => s + bp.amount, 0);
+  const totalPenalty = bonusPenalties.filter(bp => bp.type === 'penalty').reduce((s, bp) => s + bp.amount, 0);
   const netBonus = totalBonus - totalPenalty;
 
   return (
@@ -108,7 +145,7 @@ export function BonusPenaltyTab() {
       </Card>
 
       {/* Summary Cards */}
-      {data.bonusPenalties.length > 0 && (
+      {bonusPenalties.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <Card className="border-emerald-200 bg-gradient-to-br from-emerald-50 to-white rounded-2xl card-hover-lift shadow-sm">
             <CardContent className="pt-6">
@@ -141,7 +178,7 @@ export function BonusPenaltyTab() {
       )}
 
       {/* Table */}
-      {data.bonusPenalties.length > 0 && (
+      {bonusPenalties.length > 0 && (
         <Card className="rounded-2xl shadow-sm border overflow-hidden">
           <CardContent className="p-0">
             <div className="overflow-x-auto">
@@ -157,7 +194,7 @@ export function BonusPenaltyTab() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.bonusPenalties.map((bp, idx) => (
+                  {bonusPenalties.map((bp, idx) => (
                     <TableRow key={bp.id}>
                       <TableCell className="text-muted-foreground text-xs">{toPersianDigits(idx + 1)}</TableCell>
                       <TableCell>
@@ -178,7 +215,7 @@ export function BonusPenaltyTab() {
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">{bp.reason}</TableCell>
                       <TableCell>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-red-50 active:scale-90" onClick={() => { if (confirm('آیا از حذف اطمینان دارید؟')) removeBonusPenalty(currentPeriod, bp.id); }}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-red-50 active:scale-90" onClick={() => handleDelete(bp.id)}>
                           <Trash2 className="h-4 w-4 text-red-400" />
                         </Button>
                       </TableCell>

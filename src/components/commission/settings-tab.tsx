@@ -5,6 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useSalesPersons } from '@/hooks/use-api';
+import { toast } from 'sonner';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -39,8 +41,12 @@ const defaultSettings: AppSettings = {
 };
 
 export function SettingsTab() {
-  const { exportAllData, importAllData, salesPersons } = useCommissionStore();
+  const { exportAllData, importAllData } = useCommissionStore();
   const { addNotification } = useNotifications();
+  
+  // گرفتن فروشندگان از API
+  const { data: salesPersonsData } = useSalesPersons();
+  const salesPersons = salesPersonsData?.salesPersons || [];
 
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
   const [saving, setSaving] = useState(false);

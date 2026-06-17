@@ -10,6 +10,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Handshake, Trash2, Plus } from 'lucide-react';
 import { ExcelImport, ImportColumn } from './excel-import';
+import { 
+  useFinderFees, 
+  useCreateFinderFee, 
+  useDeleteFinderFee,
+  useCreateSalesPerson,
+  useSalesPersons
+} from '@/hooks/use-api';
+import { toast } from 'sonner';
 
 const FINDER_FEE_IMPORT_COLUMNS: ImportColumn[] = [
   { key: 'name', label: 'نام فروشنده', required: true, type: 'string' },
@@ -19,40 +27,113 @@ const FINDER_FEE_IMPORT_COLUMNS: ImportColumn[] = [
 ];
 
 export function FinderFeeTab() {
-  const { salesPersons, currentPeriod, getMonthlyData, addFinderFee, removeFinderFee } = useCommissionStore();
-  const data = getMonthlyData(currentPeriod);
+  const { currentPeriod } = useCommissionStore();
+  
+  // گرفتن داده‌ها از API
+  const { data: salesPersonsData } = useSalesPersons();
+  const { data: finderFeeData } = useFinderFees(currentPeriod.year, currentPeriod.month);
+  
+  // Mutations
+  const createFinderFeeMutation = useCreateFinderFee();
+  const deleteFinderFeeMutation = useDeleteFinderFee();
+  const createSalesPersonMutation = useCreateSalesPerson();
+  
+  // داده‌های محلی
+  const salesPersons = salesPersonsData?.salesPersons || [];
+  const finderFees = finderFeeData?.finderFees || [];
   const [salesPersonId, setSalesPersonId] = useState('');
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
 
   const handleAdd = () => {
-    if (!salesPersonId || !description || !amount) return;
-    addFinderFee(currentPeriod, { salesPersonId, description, amount: parseFloat(amount) });
-    setSalesPersonId(''); setDescription(''); setAmount('');
-  };
+  if (!salesPersonId || !description || !amount) return;
+  createFinderFeeMutation.mutate({
+    salesPersonId,
+    description,
+    amount: parseFloat(amount),
+    periodYear: currentPeriod.year,
+    periodMonth: currentPeriod.month,
+  });
+  setSalesPersonId(''); setDescription(''); setAmount('');
+};
+
+const handleDelete = (id: string) => {
+  if (confirm('آیا از حذف اطمینان دارید؟')) {
+    deleteFinderFeeMutation.mutate({
+      id,
+      year: currentPeriod.year,
+      month: currentPeriod.month,
+    });
+  }
+};
 
   // Handle Excel import
-  const handleExcelImport = (rows: Record<string, string | number>[]) => {
-    for (const row of rows) {
+  const handleExcelImport = async (rows: Record<string, string | number>[]) => {
+  let successCount = 0;
+  let errorCount = 0;
+
+  for (const row of rows) {
+    try {
       const name = String(row.name || '').trim();
       const code = String(row.code || '').trim() || name;
       const desc = String(row.description || '').trim();
       const amt = Number(row.amount) || 0;
-      if (!name || !desc || amt <= 0) continue;
+      
+      if (!name || !desc || amt <= 0) {
+        errorCount++;
+        continue;
+      }
 
       let person = salesPersons.find(sp => sp.name.trim() === name);
       if (!person) person = salesPersons.find(sp => sp.code.trim() === code);
       let personId = person?.id;
+
       if (!personId) {
-        useCommissionStore.getState().addSalesPerson(name, code);
-        personId = useCommissionStore.getState().salesPersons.find(sp => sp.name.trim() === name)?.id;
+        try {
+          const newPerson = await createSalesPersonMutation.mutateAsync({
+            name,
+            code,
+          });
+          personId = newPerson.data.id;
+          salesPersons.push(newPerson.data);
+        } catch (err) {
+          console.error('خطا در ایجاد فروشنده:', err);
+          errorCount++;
+          continue;
+        }
       }
-      if (personId) addFinderFee(currentPeriod, { salesPersonId: personId, description: desc, amount: amt });
+
+      if (personId) {
+        try {
+          await createFinderFeeMutation.mutateAsync({
+            salesPersonId: personId,
+            description: desc,
+            amount: amt,
+            periodYear: currentPeriod.year,
+            periodMonth: currentPeriod.month,
+          });
+          successCount++;
+        } catch (err) {
+          console.error('خطا در ثبت حق‌النصب:', err);
+          errorCount++;
+        }
+      }
+    } catch (err) {
+      console.error('خطا در پردازش ردیف:', err);
+      errorCount++;
     }
-  };
+  }
+
+  if (successCount > 0) {
+    toast.success(`${successCount} حق‌النصب با موفقیت ثبت شد`);
+  }
+  if (errorCount > 0) {
+    toast.error(`${errorCount} ردیف با خطا مواجه شد`);
+  }
+};
 
   const getSalesPersonName = (id: string) => salesPersons.find((sp) => sp.id === id)?.name || 'نامشخص';
-  const totalFinderFee = data.finderFees.reduce((sum, ff) => sum + ff.amount, 0);
+  const totalFinderFee = finderFees.reduce((sum, ff) => sum + ff.amount, 0);
 
   return (
     <div className="space-y-6">
@@ -92,7 +173,7 @@ export function FinderFeeTab() {
         </CardContent>
       </Card>
 
-      {data.finderFees.length > 0 && (
+      {finderFees.length > 0 && (
         <Card className="border-teal-200 bg-gradient-to-br from-teal-50 to-white rounded-2xl card-hover-lift shadow-sm">
           <CardContent className="pt-6">
             <p className="text-sm text-teal-600 font-semibold mb-1">مجموع حق‌النصب</p>
@@ -101,7 +182,7 @@ export function FinderFeeTab() {
         </Card>
       )}
 
-      {data.finderFees.length > 0 && (
+      {finderFees.length > 0 && (
         <Card className="rounded-2xl shadow-sm border overflow-hidden">
           <CardContent className="p-0">
             <div className="overflow-x-auto">
@@ -116,7 +197,7 @@ export function FinderFeeTab() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.finderFees.map((ff, idx) => (
+                  {finderFees.map((ff, idx) => (
                     <TableRow key={ff.id} className="transition-all duration-150">
                       <TableCell className="text-muted-foreground text-xs">{toPersianDigits(idx + 1)}</TableCell>
                       <TableCell>
@@ -128,7 +209,7 @@ export function FinderFeeTab() {
                       <TableCell>{ff.description}</TableCell>
                       <TableCell className="font-bold text-teal-700 text-left font-mono tabular-nums" dir="ltr">{formatNumber(ff.amount)}</TableCell>
                       <TableCell>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-red-50 hover:text-red-600 active:scale-90 transition-all" onClick={() => { if (confirm('آیا از حذف اطمینان دارید؟')) removeFinderFee(currentPeriod, ff.id); }}><Trash2 className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-red-50 hover:text-red-600 active:scale-90 transition-all" onClick={() => handleDelete(ff.id)}><Trash2 className="h-4 w-4" /></Button>
                       </TableCell>
                     </TableRow>
                   ))}

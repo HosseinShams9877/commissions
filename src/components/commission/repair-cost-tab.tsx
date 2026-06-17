@@ -10,6 +10,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Wrench, Trash2, Plus } from 'lucide-react';
 import { ExcelImport, ImportColumn } from './excel-import';
+import { 
+  useSalesPersons,
+  useRepairCosts, 
+  useCreateRepairCost, 
+  useDeleteRepairCost,
+  useCreateSalesPerson,
+} from '@/hooks/use-api';
+import { toast } from 'sonner';
 
 const REPAIR_COST_IMPORT_COLUMNS: ImportColumn[] = [
   { key: 'name', label: 'نام فروشنده', required: true, type: 'string' },
@@ -19,38 +27,112 @@ const REPAIR_COST_IMPORT_COLUMNS: ImportColumn[] = [
 ];
 
 export function RepairCostTab() {
-  const { salesPersons, currentPeriod, getMonthlyData, addRepairCost, removeRepairCost } = useCommissionStore();
-  const data = getMonthlyData(currentPeriod);
+  const { currentPeriod } = useCommissionStore();
+  
+  // گرفتن داده‌ها از API
+  const { data: salesPersonsData } = useSalesPersons();
+  const { data: repairCostData } = useRepairCosts(currentPeriod.year, currentPeriod.month);
+  
+  // Mutations
+  const createRepairCostMutation = useCreateRepairCost();
+  const deleteRepairCostMutation = useDeleteRepairCost();
+  const createSalesPersonMutation = useCreateSalesPerson();
+  
+  // داده‌های محلی
+  const salesPersons = salesPersonsData?.salesPersons || [];
+  const repairCosts = repairCostData?.repairCosts || [];
+
   const [salesPersonId, setSalesPersonId] = useState('');
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
 
   const handleAdd = () => {
-    if (!salesPersonId || !description || !amount) return;
-    addRepairCost(currentPeriod, { salesPersonId, description, amount: parseFloat(amount) });
-    setSalesPersonId(''); setDescription(''); setAmount('');
-  };
+  if (!salesPersonId || !description || !amount) return;
+  createRepairCostMutation.mutate({
+    salesPersonId,
+    description,
+    amount: parseFloat(amount),
+    periodYear: currentPeriod.year,
+    periodMonth: currentPeriod.month,
+  });
+  setSalesPersonId(''); setDescription(''); setAmount('');
+};
 
-  const handleExcelImport = (rows: Record<string, string | number>[]) => {
-    for (const row of rows) {
+const handleDelete = (id: string) => {
+  if (confirm('آیا از حذف اطمینان دارید؟')) {
+    deleteRepairCostMutation.mutate({
+      id,
+      year: currentPeriod.year,
+      month: currentPeriod.month,
+    });
+  }
+};
+  const handleExcelImport = async (rows: Record<string, string | number>[]) => {
+  let successCount = 0;
+  let errorCount = 0;
+
+  for (const row of rows) {
+    try {
       const name = String(row.name || '').trim();
       const code = String(row.code || '').trim() || name;
       const desc = String(row.description || '').trim();
       const amt = Number(row.amount) || 0;
-      if (!name || !desc || amt <= 0) continue;
+      
+      if (!name || !desc || amt <= 0) {
+        errorCount++;
+        continue;
+      }
+
       let person = salesPersons.find(sp => sp.name.trim() === name);
       if (!person) person = salesPersons.find(sp => sp.code.trim() === code);
       let personId = person?.id;
+
       if (!personId) {
-        useCommissionStore.getState().addSalesPerson(name, code);
-        personId = useCommissionStore.getState().salesPersons.find(sp => sp.name.trim() === name)?.id;
+        try {
+          const newPerson = await createSalesPersonMutation.mutateAsync({
+            name,
+            code,
+          });
+          personId = newPerson.data.id;
+          salesPersons.push(newPerson.data);
+        } catch (err) {
+          console.error('خطا در ایجاد فروشنده:', err);
+          errorCount++;
+          continue;
+        }
       }
-      if (personId) addRepairCost(currentPeriod, { salesPersonId: personId, description: desc, amount: amt });
+
+      if (personId) {
+        try {
+          await createRepairCostMutation.mutateAsync({
+            salesPersonId: personId,
+            description: desc,
+            amount: amt,
+            periodYear: currentPeriod.year,
+            periodMonth: currentPeriod.month,
+          });
+          successCount++;
+        } catch (err) {
+          console.error('خطا در ثبت هزینه تعمیرات:', err);
+          errorCount++;
+        }
+      }
+    } catch (err) {
+      console.error('خطا در پردازش ردیف:', err);
+      errorCount++;
     }
-  };
+  }
+
+  if (successCount > 0) {
+    toast.success(`${successCount} هزینه تعمیرات با موفقیت ثبت شد`);
+  }
+  if (errorCount > 0) {
+    toast.error(`${errorCount} ردیف با خطا مواجه شد`);
+  }
+};
 
   const getSalesPersonName = (id: string) => salesPersons.find((sp) => sp.id === id)?.name || 'نامشخص';
-  const totalRepairCost = data.repairCosts.reduce((sum, rc) => sum + rc.amount, 0);
+  const totalRepairCost = repairCosts.reduce((sum, rc) => sum + rc.amount, 0);
 
   return (
     <div className="space-y-6">
@@ -90,7 +172,7 @@ export function RepairCostTab() {
         </CardContent>
       </Card>
 
-      {data.repairCosts.length > 0 && (
+      {repairCosts.length > 0 && (
         <Card className="border-rose-200 bg-gradient-to-br from-rose-50 to-white rounded-2xl card-hover-lift shadow-sm">
           <CardContent className="pt-6">
             <p className="text-sm text-rose-600 font-semibold mb-1">مجموع هزینه تعمیرات</p>
@@ -99,7 +181,7 @@ export function RepairCostTab() {
         </Card>
       )}
 
-      {data.repairCosts.length > 0 && (
+      {repairCosts.length > 0 && (
         <Card className="rounded-2xl shadow-sm border overflow-hidden">
           <CardContent className="p-0">
             <div className="overflow-x-auto">
@@ -114,7 +196,7 @@ export function RepairCostTab() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.repairCosts.map((rc, idx) => (
+                  {repairCosts.map((rc, idx) => (
                     <TableRow key={rc.id} className="transition-all duration-150">
                       <TableCell className="text-muted-foreground text-xs">{toPersianDigits(idx + 1)}</TableCell>
                       <TableCell>
@@ -126,7 +208,8 @@ export function RepairCostTab() {
                       <TableCell>{rc.description}</TableCell>
                       <TableCell className="font-bold text-rose-700 text-left font-mono tabular-nums" dir="ltr">{formatNumber(rc.amount)}</TableCell>
                       <TableCell>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-red-50 hover:text-red-600 active:scale-90 transition-all" onClick={() => { if (confirm('آیا از حذف اطمینان دارید؟')) removeRepairCost(currentPeriod, rc.id); }}><Trash2 className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-red-50 hover:text-red-600 active:scale-90 transition-all" 
+                        onClick={() => handleDelete(rc.id)}><Trash2 className="h-4 w-4" /></Button>
                       </TableCell>
                     </TableRow>
                   ))}

@@ -1,10 +1,12 @@
 'use client';
 
-import { useCommissionStore, getPersonTotalSales } from '@/lib/store';
+import { useCommissionStore } from '@/lib/store';
 import { formatCurrency, formatNumber, formatPercent, toPersianDigits, formatShamsiDate, cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { useDashboard } from '@/hooks/use-api';
+import { useSalesPersons, useTeams, usePercentageCommissions, useTieredCommissions, useFinderFees, useTestCosts, useRepairCosts, useSalesShares, useTeamCommissions, useBonusPenalties, useSalesTargets } from '@/hooks/use-api';
 import {
   Percent, Layers, Handshake, FlaskConical, Wrench, TrendingUp,
   BarChart3, Wallet, Users, ArrowUpRight, UsersRound, Gift, Target,
@@ -12,18 +14,42 @@ import {
 } from 'lucide-react';
 
 export function DashboardTab() {
-  const { salesPersons, teams, currentPeriod, getMonthlyData } = useCommissionStore();
-  const data = getMonthlyData(currentPeriod);
+  const { currentPeriod } = useCommissionStore();
 
-  const totalPercentageComm = data.percentageCommissions.reduce((sum, pc) => sum + pc.commissionAmount, 0);
-  const totalTieredComm = data.tieredCommissions.reduce((sum, tc) => sum + tc.commissionAmount, 0);
-  const totalFinderFee = data.finderFees.reduce((sum, ff) => sum + ff.amount, 0);
-  const totalTestCost = data.testCosts.reduce((sum, tc) => sum + tc.amount, 0);
-  const totalRepairCost = data.repairCosts.reduce((sum, rc) => sum + rc.amount, 0);
-  const totalSalesShare = data.salesShares.reduce((sum, ss) => sum + ss.shareAmount, 0);
-  const totalTeamComm = data.teamCommissions.reduce((sum, tc) => sum + tc.totalLeaderCommission, 0);
-  const totalBonus = data.bonusPenalties.filter(bp => bp.type === 'bonus').reduce((s, bp) => s + bp.amount, 0);
-  const totalPenalty = data.bonusPenalties.filter(bp => bp.type === 'penalty').reduce((s, bp) => s + bp.amount, 0);
+// گرفتن همه داده‌ها از API
+const { data: salesPersonsData } = useSalesPersons();
+const { data: teamsData } = useTeams();
+const { data: percentageData } = usePercentageCommissions(currentPeriod.year, currentPeriod.month);
+const { data: tieredData } = useTieredCommissions(currentPeriod.year, currentPeriod.month);
+const { data: finderFeeData } = useFinderFees(currentPeriod.year, currentPeriod.month);
+const { data: testCostData } = useTestCosts(currentPeriod.year, currentPeriod.month);
+const { data: repairCostData } = useRepairCosts(currentPeriod.year, currentPeriod.month);
+const { data: salesShareData } = useSalesShares(currentPeriod.year, currentPeriod.month);
+const { data: teamCommissionData } = useTeamCommissions(currentPeriod.year, currentPeriod.month);
+const { data: bonusPenaltyData } = useBonusPenalties(currentPeriod.year, currentPeriod.month);
+const { data: salesTargetData } = useSalesTargets(currentPeriod.year, currentPeriod.month);
+
+// داده‌های محلی
+const salesPersons = salesPersonsData?.salesPersons || [];
+const teams = teamsData?.teams || [];
+const percentageCommissions = percentageData?.percentageCommissions || [];
+const tieredCommissions = tieredData?.tieredCommissions || [];
+const finderFees = finderFeeData?.finderFees || [];
+const testCosts = testCostData?.testCosts || [];
+const repairCosts = repairCostData?.repairCosts || [];
+const salesShares = salesShareData?.salesShares || [];
+const teamCommissions = teamCommissionData?.teamCommissions || [];
+const bonusPenalties = bonusPenaltyData?.bonusPenalties || [];
+const salesTargets = salesTargetData?.salesTargets || [];
+  const totalPercentageComm = percentageCommissions.reduce((sum, pc) => sum + pc.commissionAmount, 0);
+  const totalTieredComm = tieredCommissions.reduce((sum, tc) => sum + tc.commissionAmount, 0);
+  const totalFinderFee = finderFees.reduce((sum, ff) => sum + ff.amount, 0);
+  const totalTestCost = testCosts.reduce((sum, tc) => sum + tc.amount, 0);
+  const totalRepairCost = repairCosts.reduce((sum, rc) => sum + rc.amount, 0);
+  const totalSalesShare = salesShares.reduce((sum, ss) => sum + ss.shareAmount, 0);
+  const totalTeamComm = teamCommissions.reduce((sum, tc) => sum + tc.totalLeaderCommission, 0);
+  const totalBonus = bonusPenalties.filter(bp => bp.type === 'bonus').reduce((s, bp) => s + bp.amount, 0);
+  const totalPenalty = bonusPenalties.filter(bp => bp.type === 'penalty').reduce((s, bp) => s + bp.amount, 0);
 
   const totalCommissions = totalPercentageComm + totalTieredComm + totalFinderFee + totalSalesShare + totalTeamComm + totalBonus;
   const totalDeductions = totalTestCost + totalRepairCost + totalPenalty;
@@ -32,22 +58,37 @@ export function DashboardTab() {
   const periodLabel = formatShamsiDate(currentPeriod.year, currentPeriod.month);
 
   const summaryCards = [
-    { title: 'پورسانت درصدی', value: totalPercentageComm, icon: Percent, gradient: 'from-emerald-500 to-emerald-400', iconBg: 'bg-emerald-100', count: data.percentageCommissions.length },
-    { title: 'پورسانت پلکانی', value: totalTieredComm, icon: Layers, gradient: 'from-violet-500 to-purple-400', iconBg: 'bg-violet-100', count: data.tieredCommissions.length },
-    { title: 'حق‌النصب', value: totalFinderFee, icon: Handshake, gradient: 'from-teal-500 to-cyan-400', iconBg: 'bg-teal-100', count: data.finderFees.length },
-    { title: 'سهم از فروش', value: totalSalesShare, icon: TrendingUp, gradient: 'from-cyan-500 to-sky-400', iconBg: 'bg-cyan-100', count: data.salesShares.length },
-    { title: 'پورسانت تیمی', value: totalTeamComm, icon: UsersRound, gradient: 'from-indigo-500 to-blue-400', iconBg: 'bg-indigo-100', count: data.teamCommissions.length },
-    { title: 'پاداش', value: totalBonus, icon: Gift, gradient: 'from-lime-500 to-green-400', iconBg: 'bg-lime-100', count: data.bonusPenalties.filter(bp => bp.type === 'bonus').length },
-    { title: 'هزینه تست', value: totalTestCost, icon: FlaskConical, gradient: 'from-orange-500 to-amber-400', iconBg: 'bg-orange-100', count: data.testCosts.length },
-    { title: 'تعمیرات', value: totalRepairCost, icon: Wrench, gradient: 'from-rose-500 to-pink-400', iconBg: 'bg-rose-100', count: data.repairCosts.length },
-    { title: 'جریمه', value: totalPenalty, icon: ArrowDownCircle, gradient: 'from-red-500 to-rose-400', iconBg: 'bg-red-100', count: data.bonusPenalties.filter(bp => bp.type === 'penalty').length },
-  ];
-
+  { title: 'پورسانت درصدی', value: totalPercentageComm, icon: Percent, gradient: 'from-emerald-500 to-emerald-400', iconBg: 'bg-emerald-100', count: percentageCommissions.length },
+  { title: 'پورسانت پلکانی', value: totalTieredComm, icon: Layers, gradient: 'from-violet-500 to-purple-400', iconBg: 'bg-violet-100', count: tieredCommissions.length },
+  { title: 'حق‌النصب', value: totalFinderFee, icon: Handshake, gradient: 'from-teal-500 to-cyan-400', iconBg: 'bg-teal-100', count: finderFees.length },
+  { title: 'سهم از فروش', value: totalSalesShare, icon: TrendingUp, gradient: 'from-cyan-500 to-sky-400', iconBg: 'bg-cyan-100', count: salesShares.length },
+  { title: 'پورسانت تیمی', value: totalTeamComm, icon: UsersRound, gradient: 'from-indigo-500 to-blue-400', iconBg: 'bg-indigo-100', count: teamCommissions.length },
+  { title: 'پاداش', value: totalBonus, icon: Gift, gradient: 'from-lime-500 to-green-400', iconBg: 'bg-lime-100', count: bonusPenalties.filter(bp => bp.type === 'bonus').length },
+  { title: 'هزینه تست', value: totalTestCost, icon: FlaskConical, gradient: 'from-orange-500 to-amber-400', iconBg: 'bg-orange-100', count: testCosts.length },
+  { title: 'تعمیرات', value: totalRepairCost, icon: Wrench, gradient: 'from-rose-500 to-pink-400', iconBg: 'bg-rose-100', count: repairCosts.length },
+  { title: 'جریمه', value: totalPenalty, icon: ArrowDownCircle, gradient: 'from-red-500 to-rose-400', iconBg: 'bg-red-100', count: bonusPenalties.filter(bp => bp.type === 'penalty').length },
+];
+// محاسبه کل فروش هر فروشنده از داده‌های API
+const getPersonTotalSales = (personId: string) => {
+  let total = 0;
+  
+  // جمع فروش از پورسانت درصدی
+  percentageCommissions
+    .filter(pc => pc.salesPersonId === personId)
+    .forEach(pc => total += pc.salesAmount);
+  
+  // جمع فروش از پورسانت پلکانی
+  tieredCommissions
+    .filter(tc => tc.salesPersonId === personId)
+    .forEach(tc => total += tc.salesAmount);
+  
+  return total;
+};
   // Bar chart data - per person sales
   const personSalesData = salesPersons.map(sp => ({
     name: sp.name,
-    sales: getPersonTotalSales(useCommissionStore.getState(), currentPeriod, sp.id),
-    target: data.salesTargets.find(st => st.salesPersonId === sp.id)?.targetAmount || 0,
+    sales: getPersonTotalSales(sp.id),
+    target: salesTargets.find(st => st.salesPersonId === sp.id)?.targetAmount || 0,
   })).filter(p => p.sales > 0 || p.target > 0);
 
   const maxSales = Math.max(...personSalesData.map(p => Math.max(p.sales, p.target)), 1);
@@ -60,30 +101,30 @@ export function DashboardTab() {
   const donutTotal = donutData.reduce((s, d) => s + d.value, 0);
 
   // Per-person summary
-  const personSummary: Record<string, { name: string; percentageComm: number; tieredComm: number; finderFee: number; testCost: number; repairCost: number; salesShare: number; teamComm: number; bonus: number; penalty: number; total: number }> = {};
-  for (const sp of salesPersons) {
-    personSummary[sp.id] = { name: sp.name, percentageComm: 0, tieredComm: 0, finderFee: 0, testCost: 0, repairCost: 0, salesShare: 0, teamComm: 0, bonus: 0, penalty: 0, total: 0 };
+ const personSummary: Record<string, { name: string; percentageComm: number; tieredComm: number; finderFee: number; testCost: number; repairCost: number; salesShare: number; teamComm: number; bonus: number; penalty: number; total: number }> = {};
+for (const sp of salesPersons) {
+  personSummary[sp.id] = { name: sp.name, percentageComm: 0, tieredComm: 0, finderFee: 0, testCost: 0, repairCost: 0, salesShare: 0, teamComm: 0, bonus: 0, penalty: 0, total: 0 };
+}
+for (const pc of percentageCommissions) { if (personSummary[pc.salesPersonId]) personSummary[pc.salesPersonId].percentageComm += pc.commissionAmount; }
+for (const tc of tieredCommissions) { if (personSummary[tc.salesPersonId]) personSummary[tc.salesPersonId].tieredComm += tc.commissionAmount; }
+for (const ff of finderFees) { if (personSummary[ff.salesPersonId]) personSummary[ff.salesPersonId].finderFee += ff.amount; }
+for (const tc of testCosts) { if (personSummary[tc.salesPersonId]) personSummary[tc.salesPersonId].testCost += tc.amount; }
+for (const rc of repairCosts) { if (personSummary[rc.salesPersonId]) personSummary[rc.salesPersonId].repairCost += rc.amount; }
+for (const ss of salesShares) { if (personSummary[ss.salesPersonId]) personSummary[ss.salesPersonId].salesShare += ss.shareAmount; }
+for (const tc of teamCommissions) {
+  const team = teams.find(t => t.id === tc.teamId);
+  if (team && personSummary[team.leaderId]) personSummary[team.leaderId].teamComm += tc.totalLeaderCommission;
+}
+for (const bp of bonusPenalties) {
+  if (personSummary[bp.salesPersonId]) {
+    if (bp.type === 'bonus') personSummary[bp.salesPersonId].bonus += bp.amount;
+    else personSummary[bp.salesPersonId].penalty += bp.amount;
   }
-  for (const pc of data.percentageCommissions) { if (personSummary[pc.salesPersonId]) personSummary[pc.salesPersonId].percentageComm += pc.commissionAmount; }
-  for (const tc of data.tieredCommissions) { if (personSummary[tc.salesPersonId]) personSummary[tc.salesPersonId].tieredComm += tc.commissionAmount; }
-  for (const ff of data.finderFees) { if (personSummary[ff.salesPersonId]) personSummary[ff.salesPersonId].finderFee += ff.amount; }
-  for (const tc of data.testCosts) { if (personSummary[tc.salesPersonId]) personSummary[tc.salesPersonId].testCost += tc.amount; }
-  for (const rc of data.repairCosts) { if (personSummary[rc.salesPersonId]) personSummary[rc.salesPersonId].repairCost += rc.amount; }
-  for (const ss of data.salesShares) { if (personSummary[ss.salesPersonId]) personSummary[ss.salesPersonId].salesShare += ss.shareAmount; }
-  for (const tc of data.teamCommissions) {
-    const team = teams.find(t => t.id === tc.teamId);
-    if (team && personSummary[team.leaderId]) personSummary[team.leaderId].teamComm += tc.totalLeaderCommission;
-  }
-  for (const bp of data.bonusPenalties) {
-    if (personSummary[bp.salesPersonId]) {
-      if (bp.type === 'bonus') personSummary[bp.salesPersonId].bonus += bp.amount;
-      else personSummary[bp.salesPersonId].penalty += bp.amount;
-    }
-  }
-  for (const key of Object.keys(personSummary)) {
-    const p = personSummary[key];
-    p.total = p.percentageComm + p.tieredComm + p.finderFee + p.salesShare + p.teamComm + p.bonus - p.testCost - p.repairCost - p.penalty;
-  }
+}
+for (const key of Object.keys(personSummary)) {
+  const p = personSummary[key];
+  p.total = p.percentageComm + p.tieredComm + p.finderFee + p.salesShare + p.teamComm + p.bonus - p.testCost - p.repairCost - p.penalty;
+}
 
   return (
     <div className="space-y-6">
@@ -280,7 +321,7 @@ export function DashboardTab() {
       </div>
 
       {/* Sales Targets Summary */}
-      {data.salesTargets.length > 0 && (
+      {salesTargets.length > 0 && (
         <Card className="rounded-2xl shadow-sm border overflow-hidden">
           <CardHeader className="bg-gradient-to-r from-sky-50 to-blue-50/50 pb-3">
             <CardTitle className="flex items-center gap-2 text-sm font-bold">
@@ -290,7 +331,7 @@ export function DashboardTab() {
           </CardHeader>
           <CardContent className="p-4">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {data.salesTargets.map(st => {
+              {salesTargets.map(st => {
                 const pct = st.targetPercent || 0;
                 const name = salesPersons.find(sp => sp.id === st.salesPersonId)?.name || '—';
                 return (

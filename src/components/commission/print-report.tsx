@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useCommissionStore, getPersonTotalSales } from '@/lib/store';
+import { useCommissionStore } from '@/lib/store';
 import {
   formatCurrency, formatNumber, toPersianDigits,
   formatShamsiDate, PERSIAN_MONTHS, cn,
@@ -13,6 +13,19 @@ import {
   ArrowUpCircle, ArrowDownCircle, Users,
 } from 'lucide-react';
 import { useNotifications } from '@/hooks/use-notifications';
+import { 
+  useSalesPersons,
+  usePercentageCommissions, 
+  useTieredCommissions, 
+  useFinderFees, 
+  useTestCosts, 
+  useRepairCosts, 
+  useSalesShares, 
+  useTeamCommissions, 
+  useBonusPenalties,
+  useCollections,
+  useSettlements,
+} from '@/hooks/use-api';
 
 interface ReportData {
   company: { name: string; address: string; phone: string; logo: string };
@@ -47,13 +60,40 @@ interface ReportData {
 }
 
 export function PrintReport() {
-  const { currentPeriod, salesPersons, teams, getMonthlyData } = useCommissionStore();
+ const { currentPeriod } = useCommissionStore();
   const { addNotification } = useNotifications();
+  
+  // گرفتن همه داده‌ها از API
+  const { data: salesPersonsData } = useSalesPersons();
+  const { data: percentageData } = usePercentageCommissions(currentPeriod.year, currentPeriod.month);
+  const { data: tieredData } = useTieredCommissions(currentPeriod.year, currentPeriod.month);
+  const { data: finderFeeData } = useFinderFees(currentPeriod.year, currentPeriod.month);
+  const { data: testCostData } = useTestCosts(currentPeriod.year, currentPeriod.month);
+  const { data: repairCostData } = useRepairCosts(currentPeriod.year, currentPeriod.month);
+  const { data: salesShareData } = useSalesShares(currentPeriod.year, currentPeriod.month);
+  const { data: teamCommissionData } = useTeamCommissions(currentPeriod.year, currentPeriod.month);
+  const { data: bonusPenaltyData } = useBonusPenalties(currentPeriod.year, currentPeriod.month);
+  const { data: collectionData } = useCollections(currentPeriod.year, currentPeriod.month);
+  const { data: settlementData } = useSettlements(currentPeriod.year, currentPeriod.month);
+  
+  // داده‌های محلی
+  const salesPersons = salesPersonsData?.salesPersons || [];
+  const percentageCommissions = percentageData?.percentageCommissions || [];
+  const tieredCommissions = tieredData?.tieredCommissions || [];
+  const finderFees = finderFeeData?.finderFees || [];
+  const testCosts = testCostData?.testCosts || [];
+  const repairCosts = repairCostData?.repairCosts || [];
+  const salesShares = salesShareData?.salesShares || [];
+  const teamCommissions = teamCommissionData?.teamCommissions || [];
+  const bonusPenalties = bonusPenaltyData?.bonusPenalties || [];
+  const collections = collectionData?.collections || [];
+  const settlements = settlementData?.settlements || [];
   const [reportData, setReportData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(false);
 
   const generateReport = useCallback(async () => {
     setLoading(true);
+
     try {
       const res = await fetch(`/api/reports/pdf?year=${currentPeriod.year}&month=${currentPeriod.month}`);
       if (!res.ok) throw new Error('خطا در دریافت گزارش');
@@ -61,35 +101,35 @@ export function PrintReport() {
       setReportData(data);
     } catch {
       // Fallback: generate from local store
-      const data = getMonthlyData(currentPeriod);
+    
 
-      const totalPercentageComm = data.percentageCommissions.reduce((s, pc) => s + pc.commissionAmount, 0);
-      const totalTieredComm = data.tieredCommissions.reduce((s, tc) => s + tc.commissionAmount, 0);
-      const totalFinderFee = data.finderFees.reduce((s, ff) => s + ff.amount, 0);
-      const totalSalesShare = data.salesShares.reduce((s, ss) => s + ss.shareAmount, 0);
-      const totalTeamComm = data.teamCommissions.reduce((s, tc) => s + tc.totalLeaderCommission, 0);
-      const totalBonus = data.bonusPenalties.filter(bp => bp.type === 'bonus').reduce((s, bp) => s + bp.amount, 0);
-      const totalPenalty = data.bonusPenalties.filter(bp => bp.type === 'penalty').reduce((s, bp) => s + bp.amount, 0);
-      const totalTestCost = data.testCosts.reduce((s, tc) => s + tc.amount, 0);
-      const totalRepairCost = data.repairCosts.reduce((s, rc) => s + rc.amount, 0);
-      const totalCollections = data.collections.reduce((s, c) => s + c.amount, 0);
-      const totalSettlements = data.settlements.reduce((s, st) => s + st.amount, 0);
+      const totalPercentageComm = percentageCommissions.reduce((s, pc) => s + pc.commissionAmount, 0);
+      const totalTieredComm = tieredCommissions.reduce((s, tc) => s + tc.commissionAmount, 0);
+      const totalFinderFee = finderFees.reduce((s, ff) => s + ff.amount, 0);
+      const totalSalesShare = salesShares.reduce((s, ss) => s + ss.shareAmount, 0);
+      const totalTeamComm = teamCommissions.reduce((s, tc) => s + tc.totalLeaderCommission, 0);
+      const totalBonus = bonusPenalties.filter(bp => bp.type === 'bonus').reduce((s, bp) => s + bp.amount, 0);
+      const totalPenalty = bonusPenalties.filter(bp => bp.type === 'penalty').reduce((s, bp) => s + bp.amount, 0);
+      const totalTestCost = testCosts.reduce((s, tc) => s + tc.amount, 0);
+      const totalRepairCost = repairCosts.reduce((s, rc) => s + rc.amount, 0);
+      const totalCollections = collections.reduce((s, c) => s + c.amount, 0);
+      const totalSettlements = settlements.reduce((s, st) => s + st.amount, 0);
 
       const totalIncome = totalPercentageComm + totalTieredComm + totalFinderFee + totalSalesShare + totalTeamComm + totalBonus;
       const totalDeductions = totalTestCost + totalRepairCost + totalPenalty;
       const netAmount = totalIncome - totalDeductions;
 
       const personSummaries = salesPersons.map(sp => {
-        const pComm = data.percentageCommissions.filter(pc => pc.salesPersonId === sp.id).reduce((s, pc) => s + pc.commissionAmount, 0);
-        const tComm = data.tieredCommissions.filter(tc => tc.salesPersonId === sp.id).reduce((s, tc) => s + tc.commissionAmount, 0);
-        const fFee = data.finderFees.filter(ff => ff.salesPersonId === sp.id).reduce((s, ff) => s + ff.amount, 0);
-        const sShare = data.salesShares.filter(ss => ss.salesPersonId === sp.id).reduce((s, ss) => s + ss.shareAmount, 0);
-        const bonus = data.bonusPenalties.filter(bp => bp.salesPersonId === sp.id && bp.type === 'bonus').reduce((s, bp) => s + bp.amount, 0);
-        const penalty = data.bonusPenalties.filter(bp => bp.salesPersonId === sp.id && bp.type === 'penalty').reduce((s, bp) => s + bp.amount, 0);
-        const tCost = data.testCosts.filter(tc => tc.salesPersonId === sp.id).reduce((s, tc) => s + tc.amount, 0);
-        const rCost = data.repairCosts.filter(rc => rc.salesPersonId === sp.id).reduce((s, rc) => s + rc.amount, 0);
-        const coll = data.collections.filter(c => c.salesPersonId === sp.id).reduce((s, c) => s + c.amount, 0);
-        const settl = data.settlements.filter(st => st.salesPersonId === sp.id).reduce((s, st) => s + st.amount, 0);
+        const pComm = percentageCommissions.filter(pc => pc.salesPersonId === sp.id).reduce((s, pc) => s + pc.commissionAmount, 0);
+        const tComm = tieredCommissions.filter(tc => tc.salesPersonId === sp.id).reduce((s, tc) => s + tc.commissionAmount, 0);
+        const fFee = finderFees.filter(ff => ff.salesPersonId === sp.id).reduce((s, ff) => s + ff.amount, 0);
+        const sShare = salesShares.filter(ss => ss.salesPersonId === sp.id).reduce((s, ss) => s + ss.shareAmount, 0);
+        const bonus = bonusPenalties.filter(bp => bp.salesPersonId === sp.id && bp.type === 'bonus').reduce((s, bp) => s + bp.amount, 0);
+        const penalty = bonusPenalties.filter(bp => bp.salesPersonId === sp.id && bp.type === 'penalty').reduce((s, bp) => s + bp.amount, 0);
+        const tCost = testCosts.filter(tc => tc.salesPersonId === sp.id).reduce((s, tc) => s + tc.amount, 0);
+        const rCost = repairCosts.filter(rc => rc.salesPersonId === sp.id).reduce((s, rc) => s + rc.amount, 0);
+        const coll = collections.filter(c => c.salesPersonId === sp.id).reduce((s, c) => s + c.amount, 0);
+        const settl = settlements.filter(st => st.salesPersonId === sp.id).reduce((s, st) => s + st.amount, 0);
 
         const inc = pComm + tComm + fFee + sShare + bonus;
         const ded = tCost + rCost + penalty;
@@ -121,7 +161,7 @@ export function PrintReport() {
     } finally {
       setLoading(false);
     }
-  }, [currentPeriod, getMonthlyData, salesPersons]);
+  }, [currentPeriod, salesPersons, percentageCommissions, tieredCommissions, finderFees, testCosts, repairCosts, salesShares, teamCommissions, bonusPenalties, collections, settlements]);
 
   useEffect(() => {
     generateReport();

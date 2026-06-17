@@ -10,6 +10,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FlaskConical, Trash2, Plus } from 'lucide-react';
 import { ExcelImport, ImportColumn } from './excel-import';
+import { 
+  useSalesPersons,
+  useTestCosts, 
+  useCreateTestCost, 
+  useDeleteTestCost,
+  useCreateSalesPerson,
+} from '@/hooks/use-api';
+import { toast } from 'sonner';
 
 const TEST_COST_IMPORT_COLUMNS: ImportColumn[] = [
   { key: 'name', label: 'نام فروشنده', required: true, type: 'string' },
@@ -19,38 +27,112 @@ const TEST_COST_IMPORT_COLUMNS: ImportColumn[] = [
 ];
 
 export function TestCostTab() {
-  const { salesPersons, currentPeriod, getMonthlyData, addTestCost, removeTestCost } = useCommissionStore();
-  const data = getMonthlyData(currentPeriod);
+  const { currentPeriod } = useCommissionStore();
+  
+  // گرفتن داده‌ها از API
+  const { data: salesPersonsData } = useSalesPersons();
+  const { data: testCostData } = useTestCosts(currentPeriod.year, currentPeriod.month);
+  
+  // Mutations
+  const createTestCostMutation = useCreateTestCost();
+  const deleteTestCostMutation = useDeleteTestCost();
+  const createSalesPersonMutation = useCreateSalesPerson();
+  
+  // داده‌های محلی
+  const salesPersons = salesPersonsData?.salesPersons || [];
+  const testCosts = testCostData?.testCosts || [];
   const [salesPersonId, setSalesPersonId] = useState('');
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
 
   const handleAdd = () => {
     if (!salesPersonId || !description || !amount) return;
-    addTestCost(currentPeriod, { salesPersonId, description, amount: parseFloat(amount) });
+    createTestCostMutation.mutate({
+      salesPersonId,
+      description,
+      amount: parseFloat(amount),
+      periodYear: currentPeriod.year,
+      periodMonth: currentPeriod.month,
+    });
     setSalesPersonId(''); setDescription(''); setAmount('');
   };
 
-  const handleExcelImport = (rows: Record<string, string | number>[]) => {
+  const handleDelete = (id: string) => {
+    if (confirm('آیا از حذف اطمینان دارید؟')) {
+      deleteTestCostMutation.mutate({
+        id,
+        year: currentPeriod.year,
+        month: currentPeriod.month,
+      });
+    }
+  };
+
+  const handleExcelImport = async (rows: Record<string, string | number>[]) => {
+    let successCount = 0;
+    let errorCount = 0;
+  
     for (const row of rows) {
-      const name = String(row.name || '').trim();
-      const code = String(row.code || '').trim() || name;
-      const desc = String(row.description || '').trim();
-      const amt = Number(row.amount) || 0;
-      if (!name || !desc || amt <= 0) continue;
-      let person = salesPersons.find(sp => sp.name.trim() === name);
-      if (!person) person = salesPersons.find(sp => sp.code.trim() === code);
-      let personId = person?.id;
-      if (!personId) {
-        useCommissionStore.getState().addSalesPerson(name, code);
-        personId = useCommissionStore.getState().salesPersons.find(sp => sp.name.trim() === name)?.id;
+      try {
+        const name = String(row.name || '').trim();
+        const code = String(row.code || '').trim() || name;
+        const desc = String(row.description || '').trim();
+        const amt = Number(row.amount) || 0;
+        
+        if (!name || !desc || amt <= 0) {
+          errorCount++;
+          continue;
+        }
+  
+        let person = salesPersons.find(sp => sp.name.trim() === name);
+        if (!person) person = salesPersons.find(sp => sp.code.trim() === code);
+        let personId = person?.id;
+  
+        if (!personId) {
+          try {
+            const newPerson = await createSalesPersonMutation.mutateAsync({
+              name,
+              code,
+            });
+            personId = newPerson.data.id;
+            salesPersons.push(newPerson.data);
+          } catch (err) {
+            console.error('خطا در ایجاد فروشنده:', err);
+            errorCount++;
+            continue;
+          }
+        }
+  
+        if (personId) {
+          try {
+            await createTestCostMutation.mutateAsync({
+              salesPersonId: personId,
+              description: desc,
+              amount: amt,
+              periodYear: currentPeriod.year,
+              periodMonth: currentPeriod.month,
+            });
+            successCount++;
+          } catch (err) {
+            console.error('خطا در ثبت هزینه تست:', err);
+            errorCount++;
+          }
+        }
+      } catch (err) {
+        console.error('خطا در پردازش ردیف:', err);
+        errorCount++;
       }
-      if (personId) addTestCost(currentPeriod, { salesPersonId: personId, description: desc, amount: amt });
+    }
+  
+    if (successCount > 0) {
+      toast.success(`${successCount} هزینه تست با موفقیت ثبت شد`);
+    }
+    if (errorCount > 0) {
+      toast.error(`${errorCount} ردیف با خطا مواجه شد`);
     }
   };
 
   const getSalesPersonName = (id: string) => salesPersons.find((sp) => sp.id === id)?.name || 'نامشخص';
-  const totalTestCost = data.testCosts.reduce((sum, tc) => sum + tc.amount, 0);
+  const totalTestCost = testCosts.reduce((sum, tc) => sum + tc.amount, 0);
 
   return (
     <div className="space-y-6">
@@ -90,7 +172,7 @@ export function TestCostTab() {
         </CardContent>
       </Card>
 
-      {data.testCosts.length > 0 && (
+      {testCosts.length > 0 && (
         <Card className="border-orange-200 bg-gradient-to-br from-orange-50 to-white rounded-2xl card-hover-lift shadow-sm">
           <CardContent className="pt-6">
             <p className="text-sm text-orange-600 font-semibold mb-1">مجموع هزینه تست</p>
@@ -99,7 +181,7 @@ export function TestCostTab() {
         </Card>
       )}
 
-      {data.testCosts.length > 0 && (
+      {testCosts.length > 0 && (
         <Card className="rounded-2xl shadow-sm border overflow-hidden">
           <CardContent className="p-0">
             <div className="overflow-x-auto">
@@ -114,7 +196,7 @@ export function TestCostTab() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.testCosts.map((tc, idx) => (
+                  {testCosts.map((tc, idx) => (
                     <TableRow key={tc.id} className="transition-all duration-150">
                       <TableCell className="text-muted-foreground text-xs">{toPersianDigits(idx + 1)}</TableCell>
                       <TableCell>
@@ -126,7 +208,8 @@ export function TestCostTab() {
                       <TableCell>{tc.description}</TableCell>
                       <TableCell className="font-bold text-orange-700 text-left font-mono tabular-nums" dir="ltr">{formatNumber(tc.amount)}</TableCell>
                       <TableCell>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-red-50 hover:text-red-600 active:scale-90 transition-all" onClick={() => { if (confirm('آیا از حذف اطمینان دارید؟')) removeTestCost(currentPeriod, tc.id); }}><Trash2 className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-red-50 hover:text-red-600 active:scale-90 transition-all" 
+                        onClick={() => handleDelete(tc.id)}><Trash2 className="h-4 w-4" /></Button>
                       </TableCell>
                     </TableRow>
                   ))}

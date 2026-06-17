@@ -64,6 +64,7 @@ export default function RootLayout({
     <html lang="fa" dir="rtl" suppressHydrationWarning>
       <body
         className={`${vazirmatn.variable} antialiased bg-background text-foreground`}
+        suppressHydrationWarning  
       >
         <QueryProvider>
           <AuthProvider>

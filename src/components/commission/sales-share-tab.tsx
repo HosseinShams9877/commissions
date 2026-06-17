@@ -10,6 +10,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TrendingUp, Trash2, Plus } from 'lucide-react';
 import { ExcelImport, ImportColumn } from './excel-import';
+import { 
+  useSalesPersons,
+  useSalesShares, 
+  useCreateSalesShare, 
+  useDeleteSalesShare,
+  useCreateSalesPerson,
+} from '@/hooks/use-api';
+import { toast } from 'sonner';
 
 const SALES_SHARE_IMPORT_COLUMNS: ImportColumn[] = [
   { key: 'name', label: 'نام فروشنده', required: true, type: 'string' },
@@ -19,38 +27,112 @@ const SALES_SHARE_IMPORT_COLUMNS: ImportColumn[] = [
 ];
 
 export function SalesShareTab() {
-  const { salesPersons, currentPeriod, getMonthlyData, addSalesShare, removeSalesShare } = useCommissionStore();
-  const data = getMonthlyData(currentPeriod);
+  const { currentPeriod } = useCommissionStore();
+  
+  // گرفتن داده‌ها از API
+  const { data: salesPersonsData } = useSalesPersons();
+  const { data: salesShareData } = useSalesShares(currentPeriod.year, currentPeriod.month);
+  
+  // Mutations
+  const createSalesShareMutation = useCreateSalesShare();
+  const deleteSalesShareMutation = useDeleteSalesShare();
+  const createSalesPersonMutation = useCreateSalesPerson();
+  
+  // داده‌های محلی
+  const salesPersons = salesPersonsData?.salesPersons || [];
+  const salesShares = salesShareData?.salesShares || [];
   const [salesPersonId, setSalesPersonId] = useState('');
   const [totalSales, setTotalSales] = useState('');
   const [sharePercentage, setSharePercentage] = useState('');
 
   const handleAdd = () => {
     if (!salesPersonId || !totalSales || !sharePercentage) return;
-    addSalesShare(currentPeriod, { salesPersonId, totalSales: parseFloat(totalSales), sharePercentage: parseFloat(sharePercentage) });
+    createSalesShareMutation.mutate({
+      salesPersonId,
+      totalSales: parseFloat(totalSales),
+      sharePercentage: parseFloat(sharePercentage),
+      periodYear: currentPeriod.year,
+      periodMonth: currentPeriod.month,
+    });
     setSalesPersonId(''); setTotalSales(''); setSharePercentage('');
   };
 
-  const handleExcelImport = (rows: Record<string, string | number>[]) => {
+  const handleDelete = (id: string) => {
+    if (confirm('آیا از حذف اطمینان دارید؟')) {
+      deleteSalesShareMutation.mutate({
+        id,
+        year: currentPeriod.year,
+        month: currentPeriod.month,
+      });
+    }
+  };
+
+  const handleExcelImport = async (rows: Record<string, string | number>[]) => {
+    let successCount = 0;
+    let errorCount = 0;
+  
     for (const row of rows) {
-      const name = String(row.name || '').trim();
-      const code = String(row.code || '').trim() || name;
-      const sales = Number(row.totalSales) || 0;
-      const pct = Number(row.sharePercentage) || 0;
-      if (!name || sales <= 0 || pct <= 0) continue;
-      let person = salesPersons.find(sp => sp.name.trim() === name);
-      if (!person) person = salesPersons.find(sp => sp.code.trim() === code);
-      let personId = person?.id;
-      if (!personId) {
-        useCommissionStore.getState().addSalesPerson(name, code);
-        personId = useCommissionStore.getState().salesPersons.find(sp => sp.name.trim() === name)?.id;
+      try {
+        const name = String(row.name || '').trim();
+        const code = String(row.code || '').trim() || name;
+        const sales = Number(row.totalSales) || 0;
+        const pct = Number(row.sharePercentage) || 0;
+        
+        if (!name || sales <= 0 || pct <= 0) {
+          errorCount++;
+          continue;
+        }
+  
+        let person = salesPersons.find(sp => sp.name.trim() === name);
+        if (!person) person = salesPersons.find(sp => sp.code.trim() === code);
+        let personId = person?.id;
+  
+        if (!personId) {
+          try {
+            const newPerson = await createSalesPersonMutation.mutateAsync({
+              name,
+              code,
+            });
+            personId = newPerson.data.id;
+            salesPersons.push(newPerson.data);
+          } catch (err) {
+            console.error('خطا در ایجاد فروشنده:', err);
+            errorCount++;
+            continue;
+          }
+        }
+  
+        if (personId) {
+          try {
+            await createSalesShareMutation.mutateAsync({
+              salesPersonId: personId,
+              totalSales: sales,
+              sharePercentage: pct,
+              periodYear: currentPeriod.year,
+              periodMonth: currentPeriod.month,
+            });
+            successCount++;
+          } catch (err) {
+            console.error('خطا در ثبت سهم از فروش:', err);
+            errorCount++;
+          }
+        }
+      } catch (err) {
+        console.error('خطا در پردازش ردیف:', err);
+        errorCount++;
       }
-      if (personId) addSalesShare(currentPeriod, { salesPersonId: personId, totalSales: sales, sharePercentage: pct });
+    }
+  
+    if (successCount > 0) {
+      toast.success(`${successCount} سهم از فروش با موفقیت ثبت شد`);
+    }
+    if (errorCount > 0) {
+      toast.error(`${errorCount} ردیف با خطا مواجه شد`);
     }
   };
 
   const getSalesPersonName = (id: string) => salesPersons.find((sp) => sp.id === id)?.name || 'نامشخص';
-  const totalShareAmount = data.salesShares.reduce((sum, ss) => sum + ss.shareAmount, 0);
+  const totalShareAmount = salesShares.reduce((sum, ss) => sum + ss.shareAmount, 0);
 
   return (
     <div className="space-y-6">
@@ -90,12 +172,12 @@ export function SalesShareTab() {
         </CardContent>
       </Card>
 
-      {data.salesShares.length > 0 && (
+      {salesShares.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Card className="border-cyan-200 bg-gradient-to-br from-cyan-50 to-white rounded-2xl card-hover-lift shadow-sm">
             <CardContent className="pt-6">
               <p className="text-sm text-cyan-600 font-semibold mb-1">مجموع فروش ثبت شده</p>
-              <p className="text-xl font-extrabold tracking-tight text-cyan-700 animate-count-up" dir="ltr">{formatCurrency(data.salesShares.reduce((sum, ss) => sum + ss.totalSales, 0))}</p>
+              <p className="text-xl font-extrabold tracking-tight text-cyan-700 animate-count-up" dir="ltr">{formatCurrency(salesShares.reduce((sum, ss) => sum + ss.totalSales, 0))}</p>
             </CardContent>
           </Card>
           <Card className="border-amber-200 bg-gradient-to-br from-amber-50 to-white rounded-2xl card-hover-lift shadow-sm">
@@ -107,7 +189,7 @@ export function SalesShareTab() {
         </div>
       )}
 
-      {data.salesShares.length > 0 && (
+      {salesShares.length > 0 && (
         <Card className="rounded-2xl shadow-sm border overflow-hidden">
           <CardContent className="p-0">
             <div className="overflow-x-auto">
@@ -123,7 +205,7 @@ export function SalesShareTab() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.salesShares.map((ss, idx) => (
+                  {salesShares.map((ss, idx) => (
                     <TableRow key={ss.id} className="transition-all duration-150">
                       <TableCell className="text-muted-foreground text-xs">{toPersianDigits(idx + 1)}</TableCell>
                       <TableCell>
@@ -136,7 +218,8 @@ export function SalesShareTab() {
                       <TableCell>{formatPercent(ss.sharePercentage)}</TableCell>
                       <TableCell className="font-bold text-cyan-700 text-left font-mono tabular-nums" dir="ltr">{formatNumber(ss.shareAmount)}</TableCell>
                       <TableCell>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-red-50 hover:text-red-600 active:scale-90 transition-all" onClick={() => { if (confirm('آیا از حذف اطمینان دارید؟')) removeSalesShare(currentPeriod, ss.id); }}><Trash2 className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-red-50 hover:text-red-600 active:scale-90 transition-all"
+                         onClick={() => handleDelete(ss.id)}><Trash2 className="h-4 w-4" /></Button>
                       </TableCell>
                     </TableRow>
                   ))}
