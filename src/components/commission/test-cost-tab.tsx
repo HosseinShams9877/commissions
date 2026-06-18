@@ -206,7 +206,9 @@ export function TestCostTab() {
                         </div>
                       </TableCell>
                       <TableCell>{tc.description}</TableCell>
-                      <TableCell className="font-bold text-orange-700 text-left font-mono tabular-nums" dir="ltr">{formatNumber(tc.amount)}</TableCell>
+                      <TableCell className="font-bold text-teal-700 text-right font-mono tabular-nums">
+  <span dir="ltr" style={{ unicodeBidi: 'isolate' }}>{formatNumber(tc.amount)}</span>
+</TableCell>
                       <TableCell>
                         <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-red-50 hover:text-red-600 active:scale-90 transition-all" 
                         onClick={() => handleDelete(tc.id)}><Trash2 className="h-4 w-4" /></Button>

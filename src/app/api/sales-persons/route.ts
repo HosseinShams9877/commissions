@@ -7,7 +7,10 @@ export async function GET() {
     const salesPersons = await db.salesPerson.findMany({
       orderBy: { name: 'asc' },
     });
-    return NextResponse.json({ salesPersons });
+    return NextResponse.json({
+      success: true,
+      salesPersons,
+    });
   } catch (error) {
     console.error('Failed to fetch sales persons:', error);
     return NextResponse.json({ error: 'Failed to fetch sales persons' }, { status: 500 });
@@ -35,7 +38,10 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({ salesPerson }, { status: 201 });
+    return NextResponse.json({
+      success: true,
+      data: salesPerson,
+    }, { status: 201 });
   } catch (error: any) {
     if (error?.code === 'P2002') {
       return NextResponse.json({ error: 'کد فروشنده تکراری است' }, { status: 409 });
@@ -68,7 +74,10 @@ export async function PUT(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({ salesPerson });
+    return NextResponse.json({
+      success: true,
+      data: salesPerson,
+    });
   } catch (error) {
     console.error('Failed to update sales person:', error);
     return NextResponse.json({ error: 'Failed to update sales person' }, { status: 500 });
@@ -84,7 +93,10 @@ export async function DELETE(request: NextRequest) {
     }
 
     await db.salesPerson.delete({ where: { id } });
-    return NextResponse.json({ success: true });
+    return NextResponse.json({
+      success: true,
+      message: 'فروشنده با موفقیت حذف شد',
+    });
   } catch (error) {
     console.error('Failed to delete sales person:', error);
     return NextResponse.json({ error: 'Failed to delete sales person' }, { status: 500 });

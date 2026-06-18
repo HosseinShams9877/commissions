@@ -576,40 +576,50 @@ const getPersonTotalSales = (personId: string) => {
         <Card className="rounded-2xl shadow-sm border overflow-hidden">
           <CardContent className="p-0">
             <div className="overflow-x-auto">
-              <Table className="table-zebra">
-                <TableHeader>
-                  <TableRow className="bg-gradient-to-r from-blue-50/80 to-indigo-50/30">
-                    <TableHead className="text-right font-semibold text-blue-800 text-xs">ردیف</TableHead>
-                    <TableHead className="text-right font-semibold text-blue-800 text-xs">تیم</TableHead>
-                    <TableHead className="text-right font-semibold text-blue-800 text-xs">سرگروه</TableHead>
-                    <TableHead className="text-right font-semibold text-blue-800 text-xs">فروش شخصی</TableHead>
-                    <TableHead className="text-right font-semibold text-blue-800 text-xs">کل فروش تیم</TableHead>
-                    <TableHead className="text-right font-semibold text-blue-800 text-xs">پورسانت شخصی</TableHead>
-                    <TableHead className="text-right font-semibold text-blue-800 text-xs">پورسانت تیمی</TableHead>
-                    <TableHead className="text-right font-semibold text-blue-800 text-xs">مجموع</TableHead>
-                    <TableHead className="text-right font-semibold text-blue-800 text-xs">عملیات</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {teamCommissions.map((tc, idx) => {
-                    const team = teams.find(t => t.id === tc.teamId);
-                    return (
-                      <TableRow key={tc.id}>
-                        <TableCell className="text-muted-foreground text-xs">{toPersianDigits(idx + 1)}</TableCell>
-                        <TableCell className="font-medium">{team?.name || '—'}</TableCell>
-                        <TableCell>{getPersonName(team?.leaderId || '')}</TableCell>
-                        <TableCell className="text-left font-mono tabular-nums" dir="ltr">{formatNumber(tc.leaderPersonalSales)}</TableCell>
-                        <TableCell className="text-left font-mono tabular-nums" dir="ltr">{formatNumber(tc.totalTeamSales)}</TableCell>
-                        <TableCell className="text-left font-mono tabular-nums text-blue-600" dir="ltr">{formatNumber(tc.leaderPersonalCommission)}</TableCell>
-                        <TableCell className="text-left font-mono tabular-nums text-indigo-600" dir="ltr">{formatNumber(tc.teamCommissionAmount)}</TableCell>
-                        <TableCell className="font-bold text-emerald-700 text-left font-mono tabular-nums" dir="ltr">{formatNumber(tc.totalLeaderCommission)}</TableCell>
-                        <TableCell><Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-red-50 active:scale-90" 
-                       onClick={() => handleDeleteTeamCommission(tc.id)}><Trash2 className="h-4 w-4 text-red-400" /></Button></TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
+            <Table className="table-zebra">
+  <TableHeader>
+    <TableRow className="bg-gradient-to-r from-blue-50/80 to-indigo-50/30">
+      <TableHead className="text-right font-semibold text-blue-800 text-xs">ردیف</TableHead>
+      <TableHead className="text-right font-semibold text-blue-800 text-xs">تیم</TableHead>
+      <TableHead className="text-right font-semibold text-blue-800 text-xs">سرگروه</TableHead>
+      <TableHead className="text-right font-semibold text-blue-800 text-xs">فروش شخصی</TableHead>
+      <TableHead className="text-right font-semibold text-blue-800 text-xs">کل فروش تیم</TableHead>
+      <TableHead className="text-right font-semibold text-blue-800 text-xs">پورسانت شخصی</TableHead>
+      <TableHead className="text-right font-semibold text-blue-800 text-xs">پورسانت تیمی</TableHead>
+      <TableHead className="text-right font-semibold text-blue-800 text-xs">مجموع</TableHead>
+      <TableHead className="text-right font-semibold text-blue-800 text-xs">عملیات</TableHead>
+    </TableRow>
+  </TableHeader>
+  <TableBody>
+    {teamCommissions.map((tc, idx) => {
+      const team = teams.find(t => t.id === tc.teamId);
+      return (
+        <TableRow key={tc.id}>
+          <TableCell className="text-muted-foreground text-xs">{toPersianDigits(idx + 1)}</TableCell>
+          <TableCell className="font-medium">{team?.name || '—'}</TableCell>
+          <TableCell>{getPersonName(team?.leaderId || '')}</TableCell>
+          <TableCell className="text-right font-mono tabular-nums">
+            <span dir="ltr" style={{ unicodeBidi: 'isolate' }}>{formatNumber(tc.leaderPersonalSales)}</span>
+          </TableCell>
+          <TableCell className="text-right font-mono tabular-nums">
+            <span dir="ltr" style={{ unicodeBidi: 'isolate' }}>{formatNumber(tc.totalTeamSales)}</span>
+          </TableCell>
+          <TableCell className="text-right font-mono tabular-nums text-blue-600">
+            <span dir="ltr" style={{ unicodeBidi: 'isolate' }}>{formatNumber(tc.leaderPersonalCommission)}</span>
+          </TableCell>
+          <TableCell className="text-right font-mono tabular-nums text-indigo-600">
+            <span dir="ltr" style={{ unicodeBidi: 'isolate' }}>{formatNumber(tc.teamCommissionAmount)}</span>
+          </TableCell>
+          <TableCell className="font-bold text-emerald-700 text-right font-mono tabular-nums">
+            <span dir="ltr" style={{ unicodeBidi: 'isolate' }}>{formatNumber(tc.totalLeaderCommission)}</span>
+          </TableCell>
+          <TableCell><Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-red-50 active:scale-90" 
+         onClick={() => handleDeleteTeamCommission(tc.id)}><Trash2 className="h-4 w-4 text-red-400" /></Button></TableCell>
+        </TableRow>
+      );
+    })}
+  </TableBody>
+</Table>
             </div>
           </CardContent>
         </Card>

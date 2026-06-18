@@ -930,78 +930,102 @@ const createSalesPersonMutation = useCreateSalesPerson();
               </CardHeader>
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
-                  <Table className="table-zebra">
-                    <TableHeader>
-                      <TableRow className="bg-gradient-to-r from-emerald-50/80 to-teal-50/40">
-                        <TableHead className="text-right font-semibold text-emerald-800 text-xs">فروشنده</TableHead>
-                        <TableHead className="text-right font-semibold text-emerald-800 text-xs">فروش</TableHead>
-                        <TableHead className="text-right font-semibold text-teal-800 text-xs">وصول</TableHead>
-                        <TableHead className="text-right font-semibold text-emerald-800 text-xs">درآمد</TableHead>
-                        <TableHead className="text-right font-semibold text-rose-800 text-xs">کسورات</TableHead>
-                        <TableHead className="text-right font-semibold text-amber-800 text-xs">خالص</TableHead>
-                        <TableHead className="text-right font-semibold text-amber-800 text-xs">تسویه</TableHead>
-                        <TableHead className="text-right font-semibold text-rose-800 text-xs">مانده</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {Object.entries(aggregatedFinancials).map(([id, p]) => {
-                        if (!p.sales && !p.collections && !p.commissions && !p.settled) return null;
-                        const name = getPersonName(id);
-                        return (
-                          <TableRow key={id} className="transition-all duration-150">
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <div className="w-7 h-7 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 text-white text-xs font-bold flex items-center justify-center shadow-sm">
-                                  {name.charAt(0)}
-                                </div>
-                                <span className="font-medium text-sm">{name}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-left font-mono tabular-nums text-xs" dir="ltr">{p.sales ? formatNumber(p.sales) : '−'}</TableCell>
-                            <TableCell className="text-left font-mono tabular-nums text-xs text-teal-700" dir="ltr">{p.collections ? formatNumber(p.collections) : '−'}</TableCell>
-                            <TableCell className="text-left font-mono tabular-nums text-xs text-emerald-700" dir="ltr">{p.commissions ? formatNumber(p.commissions) : '−'}</TableCell>
-                            <TableCell className="text-left font-mono tabular-nums text-xs text-rose-600" dir="ltr">{p.deductions ? formatNumber(p.deductions) : '−'}</TableCell>
-                            <TableCell className="text-left font-mono tabular-nums text-xs text-amber-700" dir="ltr">{p.netPayable ? formatNumber(p.netPayable) : '−'}</TableCell>
-                            <TableCell className="text-left font-mono tabular-nums text-xs text-amber-700" dir="ltr">{p.settled ? formatNumber(p.settled) : '−'}</TableCell>
-                            <TableCell>
-                              <Badge
-                                variant={p.remaining > 0 ? 'destructive' : 'default'}
-                                className={cn('font-bold font-mono tabular-nums text-xs',
-                                  p.remaining <= 0 && 'bg-emerald-100 text-emerald-800 border-emerald-200 hover:bg-emerald-100',
-                                  p.remaining > 0 && 'bg-rose-100 text-rose-800 border-rose-200 hover:bg-rose-100'
-                                )}
-                              >
-                                {p.remaining !== 0 ? formatNumber(Math.abs(p.remaining)) : '−'}
-                                {p.remaining > 0 && ' بدهکار'}
-                              </Badge>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                      {/* Totals row */}
-                      <TableRow className="bg-gradient-to-r from-gray-50 to-gray-100/50 font-bold border-t-2 border-gray-200">
-                        <TableCell className="text-sm font-bold">جمع کل</TableCell>
-                        <TableCell className="text-left font-mono tabular-nums text-xs" dir="ltr">{formatNumber(totalSales)}</TableCell>
-                        <TableCell className="text-left font-mono tabular-nums text-xs text-teal-700" dir="ltr">{formatNumber(totalCollections)}</TableCell>
-                        <TableCell className="text-left font-mono tabular-nums text-xs text-emerald-700" dir="ltr">{formatNumber(totalCommissions)}</TableCell>
-                        <TableCell className="text-left font-mono tabular-nums text-xs text-rose-600" dir="ltr">{formatNumber(totalDeductions)}</TableCell>
-                        <TableCell className="text-left font-mono tabular-nums text-xs text-amber-700" dir="ltr">{formatNumber(netPayable)}</TableCell>
-                        <TableCell className="text-left font-mono tabular-nums text-xs text-amber-700" dir="ltr">{formatNumber(totalSettlements)}</TableCell>
-                        <TableCell>
-                          <Badge
-                            variant={remainingDebt > 0 ? 'destructive' : 'default'}
-                            className={cn('font-bold font-mono tabular-nums text-xs',
-                              remainingDebt <= 0 && 'bg-emerald-100 text-emerald-800 border-emerald-200 hover:bg-emerald-100',
-                              remainingDebt > 0 && 'bg-rose-100 text-rose-800 border-rose-200 hover:bg-rose-100'
-                            )}
-                          >
-                            {remainingDebt !== 0 ? formatNumber(Math.abs(remainingDebt)) : '−'}
-                            {remainingDebt > 0 && ' بدهکار'}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    </TableBody>
-                  </Table>
+                <Table className="table-zebra">
+  <TableHeader>
+    <TableRow className="bg-gradient-to-r from-emerald-50/80 to-teal-50/40">
+      <TableHead className="text-right font-semibold text-emerald-800 text-xs">فروشنده</TableHead>
+      <TableHead className="text-right font-semibold text-emerald-800 text-xs">فروش</TableHead>
+      <TableHead className="text-right font-semibold text-teal-800 text-xs">وصول</TableHead>
+      <TableHead className="text-right font-semibold text-emerald-800 text-xs">درآمد</TableHead>
+      <TableHead className="text-right font-semibold text-rose-800 text-xs">کسورات</TableHead>
+      <TableHead className="text-right font-semibold text-amber-800 text-xs">خالص</TableHead>
+      <TableHead className="text-right font-semibold text-amber-800 text-xs">تسویه</TableHead>
+      <TableHead className="text-right font-semibold text-rose-800 text-xs">مانده</TableHead>
+    </TableRow>
+  </TableHeader>
+  <TableBody>
+    {Object.entries(aggregatedFinancials).map(([id, p]) => {
+      if (!p.sales && !p.collections && !p.commissions && !p.settled) return null;
+      const name = getPersonName(id);
+      return (
+        <TableRow key={id} className="transition-all duration-150">
+          <TableCell>
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 text-white text-xs font-bold flex items-center justify-center shadow-sm">
+                {name.charAt(0)}
+              </div>
+              <span className="font-medium text-sm">{name}</span>
+            </div>
+          </TableCell>
+          <TableCell className="text-right font-mono tabular-nums text-xs">
+            <span dir="ltr" style={{ unicodeBidi: 'isolate' }}>{p.sales ? formatNumber(p.sales) : '−'}</span>
+          </TableCell>
+          <TableCell className="text-right font-mono tabular-nums text-xs text-teal-700">
+            <span dir="ltr" style={{ unicodeBidi: 'isolate' }}>{p.collections ? formatNumber(p.collections) : '−'}</span>
+          </TableCell>
+          <TableCell className="text-right font-mono tabular-nums text-xs text-emerald-700">
+            <span dir="ltr" style={{ unicodeBidi: 'isolate' }}>{p.commissions ? formatNumber(p.commissions) : '−'}</span>
+          </TableCell>
+          <TableCell className="text-right font-mono tabular-nums text-xs text-rose-600">
+            <span dir="ltr" style={{ unicodeBidi: 'isolate' }}>{p.deductions ? formatNumber(p.deductions) : '−'}</span>
+          </TableCell>
+          <TableCell className="text-right font-mono tabular-nums text-xs text-amber-700">
+            <span dir="ltr" style={{ unicodeBidi: 'isolate' }}>{p.netPayable ? formatNumber(p.netPayable) : '−'}</span>
+          </TableCell>
+          <TableCell className="text-right font-mono tabular-nums text-xs text-amber-700">
+            <span dir="ltr" style={{ unicodeBidi: 'isolate' }}>{p.settled ? formatNumber(p.settled) : '−'}</span>
+          </TableCell>
+          <TableCell>
+            <Badge
+              variant={p.remaining > 0 ? 'destructive' : 'default'}
+              className={cn('font-bold font-mono tabular-nums text-xs',
+                p.remaining <= 0 && 'bg-emerald-100 text-emerald-800 border-emerald-200 hover:bg-emerald-100',
+                p.remaining > 0 && 'bg-rose-100 text-rose-800 border-rose-200 hover:bg-rose-100'
+              )}
+            >
+              {p.remaining !== 0 ? formatNumber(Math.abs(p.remaining)) : '−'}
+              {p.remaining > 0 && ' بدهکار'}
+            </Badge>
+          </TableCell>
+        </TableRow>
+      );
+    })}
+    {/* Totals row */}
+    <TableRow className="bg-gradient-to-r from-gray-50 to-gray-100/50 font-bold border-t-2 border-gray-200">
+      <TableCell className="text-sm font-bold">جمع کل</TableCell>
+      <TableCell className="text-right font-mono tabular-nums text-xs">
+        <span dir="ltr" style={{ unicodeBidi: 'isolate' }}>{formatNumber(totalSales)}</span>
+      </TableCell>
+      <TableCell className="text-right font-mono tabular-nums text-xs text-teal-700">
+        <span dir="ltr" style={{ unicodeBidi: 'isolate' }}>{formatNumber(totalCollections)}</span>
+      </TableCell>
+      <TableCell className="text-right font-mono tabular-nums text-xs text-emerald-700">
+        <span dir="ltr" style={{ unicodeBidi: 'isolate' }}>{formatNumber(totalCommissions)}</span>
+      </TableCell>
+      <TableCell className="text-right font-mono tabular-nums text-xs text-rose-600">
+        <span dir="ltr" style={{ unicodeBidi: 'isolate' }}>{formatNumber(totalDeductions)}</span>
+      </TableCell>
+      <TableCell className="text-right font-mono tabular-nums text-xs text-amber-700">
+        <span dir="ltr" style={{ unicodeBidi: 'isolate' }}>{formatNumber(netPayable)}</span>
+      </TableCell>
+      <TableCell className="text-right font-mono tabular-nums text-xs text-amber-700">
+        <span dir="ltr" style={{ unicodeBidi: 'isolate' }}>{formatNumber(totalSettlements)}</span>
+      </TableCell>
+      <TableCell>
+        <Badge
+          variant={remainingDebt > 0 ? 'destructive' : 'default'}
+          className={cn('font-bold font-mono tabular-nums text-xs',
+            remainingDebt <= 0 && 'bg-emerald-100 text-emerald-800 border-emerald-200 hover:bg-emerald-100',
+            remainingDebt > 0 && 'bg-rose-100 text-rose-800 border-rose-200 hover:bg-rose-100'
+          )}
+        >
+          {remainingDebt !== 0 ? formatNumber(Math.abs(remainingDebt)) : '−'}
+          {remainingDebt > 0 && ' بدهکار'}
+        </Badge>
+      </TableCell>
+    </TableRow>
+  </TableBody>
+</Table>
                 </div>
               </CardContent>
             </Card>

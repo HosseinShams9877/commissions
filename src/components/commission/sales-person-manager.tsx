@@ -145,54 +145,56 @@ export function SalesPersonManager() {
         ) : (
           <div className="overflow-x-auto">
             <Table className="table-zebra">
-              <TableHeader>
-                <TableRow className="bg-gradient-to-r from-emerald-50/80 to-emerald-50/30 hover:bg-gradient-to-r hover:from-emerald-50/80 hover:to-emerald-50/30">
-                  <TableHead className="text-right font-semibold text-emerald-800 text-xs">ردیف</TableHead>
-                  <TableHead className="text-right font-semibold text-emerald-800 text-xs">نام فروشنده</TableHead>
-                  <TableHead className="text-right font-semibold text-emerald-800 text-xs">کد</TableHead>
-                  <TableHead className="text-right font-semibold text-emerald-800 text-xs">درصد پیش‌فرض</TableHead>
-                  <TableHead className="text-right font-semibold text-emerald-800 text-xs">بانک</TableHead>
-                  <TableHead className="text-right font-semibold text-emerald-800 text-xs">عملیات</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {salesPersons.map((sp, idx) => (
-                  <TableRow key={sp.id} className="transition-all duration-150">
-                    <TableCell className="text-muted-foreground text-xs">{toPersianDigits(idx + 1)}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 text-white text-xs font-bold flex items-center justify-center shadow-sm">
-                          {sp.name.charAt(0)}
-                        </div>
-                        <span className="font-medium">{sp.name}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="font-mono text-xs" dir="ltr">{sp.code}</TableCell>
-                    <TableCell>
-                      {sp.defaultPercentage ? (
-                        <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 text-[10px]">
-                          {formatPercent(sp.defaultPercentage)}
-                        </Badge>
-                      ) : (
-                        <span className="text-muted-foreground text-xs">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{sp.bankName || '—'}</TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-amber-50 hover:text-amber-600 active:scale-90 transition-all" onClick={() => handleEdit(sp.id, sp)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-red-50 hover:text-red-600 active:scale-90 transition-all" 
-                        onClick={() => handleDelete(sp.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+  <TableHeader>
+    <TableRow className="bg-gradient-to-r from-emerald-50/80 to-emerald-50/30 hover:bg-gradient-to-r hover:from-emerald-50/80 hover:to-emerald-50/30">
+      <TableHead className="text-right font-semibold text-emerald-800 text-xs">ردیف</TableHead>
+      <TableHead className="text-right font-semibold text-emerald-800 text-xs">نام فروشنده</TableHead>
+      <TableHead className="text-right font-semibold text-emerald-800 text-xs">کد</TableHead>
+      <TableHead className="text-right font-semibold text-emerald-800 text-xs">درصد پیش‌فرض</TableHead>
+      <TableHead className="text-right font-semibold text-emerald-800 text-xs">بانک</TableHead>
+      <TableHead className="text-right font-semibold text-emerald-800 text-xs">عملیات</TableHead>
+    </TableRow>
+  </TableHeader>
+  <TableBody>
+    {salesPersons.map((sp, idx) => (
+      <TableRow key={sp.id} className="transition-all duration-150">
+        <TableCell className="text-muted-foreground text-xs">{toPersianDigits(idx + 1)}</TableCell>
+        <TableCell>
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 text-white text-xs font-bold flex items-center justify-center shadow-sm">
+              {sp.name.charAt(0)}
+            </div>
+            <span className="font-medium">{sp.name}</span>
+          </div>
+        </TableCell>
+        <TableCell className="text-right font-mono text-xs">
+          <span dir="ltr" style={{ unicodeBidi: 'isolate' }}>{sp.code}</span>
+        </TableCell>
+        <TableCell className="text-right">
+          {sp.defaultPercentage ? (
+            <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 text-[10px]">
+              <span dir="ltr" style={{ unicodeBidi: 'isolate' }}>{formatPercent(sp.defaultPercentage)}</span>
+            </Badge>
+          ) : (
+            <span className="text-muted-foreground text-xs">—</span>
+          )}
+        </TableCell>
+        <TableCell className="text-right text-xs text-muted-foreground">{sp.bankName || '—'}</TableCell>
+        <TableCell>
+          <div className="flex gap-1">
+            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-amber-50 hover:text-amber-600 active:scale-90 transition-all" onClick={() => handleEdit(sp.id, sp)}>
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-red-50 hover:text-red-600 active:scale-90 transition-all" 
+            onClick={() => handleDelete(sp.id)}>
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        </TableCell>
+      </TableRow>
+    ))}
+  </TableBody>
+</Table>
           </div>
         )}
       </CardContent>

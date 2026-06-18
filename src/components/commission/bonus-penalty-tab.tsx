@@ -210,9 +210,11 @@ const handleDelete = (id: string) => {
                           <span className="font-medium">{getPersonName(bp.salesPersonId)}</span>
                         </div>
                       </TableCell>
-                      <TableCell className={cn('font-bold text-left font-mono tabular-nums', bp.type === 'bonus' ? 'text-emerald-700' : 'text-rose-700')} dir="ltr">
-                        {bp.type === 'bonus' ? '+' : '−'}{formatNumber(bp.amount)}
-                      </TableCell>
+                      <TableCell className={cn('font-bold text-right font-mono tabular-nums', bp.type === 'bonus' ? 'text-emerald-700' : 'text-rose-700')}>
+  <span dir="ltr" style={{ unicodeBidi: 'isolate' }}>
+    {bp.type === 'bonus' ? '+' : '−'}{formatNumber(bp.amount)}
+  </span>
+</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{bp.reason}</TableCell>
                       <TableCell>
                         <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-red-50 active:scale-90" onClick={() => handleDelete(bp.id)}>

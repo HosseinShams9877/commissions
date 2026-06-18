@@ -206,7 +206,9 @@ const handleDelete = (id: string) => {
                         </div>
                       </TableCell>
                       <TableCell>{rc.description}</TableCell>
-                      <TableCell className="font-bold text-rose-700 text-left font-mono tabular-nums" dir="ltr">{formatNumber(rc.amount)}</TableCell>
+                      <TableCell className="font-bold text-rose-700 text-right font-mono tabular-nums">
+  <span dir="ltr" style={{ unicodeBidi: 'isolate' }}>{formatNumber(rc.amount)}</span>
+</TableCell>
                       <TableCell>
                         <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-red-50 hover:text-red-600 active:scale-90 transition-all" 
                         onClick={() => handleDelete(rc.id)}><Trash2 className="h-4 w-4" /></Button>

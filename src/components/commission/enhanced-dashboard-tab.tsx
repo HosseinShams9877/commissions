@@ -322,39 +322,60 @@ const getPersonTotalSales = (personId: string) => {
 
         {/* Commission Type Pie Chart */}
         <Card className="rounded-2xl shadow-sm border overflow-hidden">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-bold">ترکیب پورسانت‌ها</CardTitle>
-          </CardHeader>
-          <CardContent className="p-4">
-            {commissionBreakdown.length > 0 ? (
-              <ResponsiveContainer width="100%" height={280}>
-                <PieChart>
-                  <Pie
-                    data={commissionBreakdown}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={55}
-                    outerRadius={85}
-                    paddingAngle={3}
-                    dataKey="value"
-                    label={({ name, percent }) => `${name} (${toPersianDigits((percent * 100).toFixed(0))}٪)`}
-                    labelLine={false}
-                  >
-                    {commissionBreakdown.map((_, idx) => (
-                      <Cell key={idx} fill={CHART_COLORS[idx % CHART_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value: number) => formatNumber(value)} />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="py-16 text-center text-muted-foreground">
-                <Activity className="h-12 w-12 mx-auto mb-3 opacity-20" />
-                <p className="text-sm">نمودار پس از ثبت داده نمایش داده می‌شود</p>
+  <CardHeader className="pb-2">
+    <CardTitle className="text-sm font-bold">ترکیب پورسانت‌ها</CardTitle>
+  </CardHeader>
+  <CardContent className="p-4">
+    {commissionBreakdown.length > 0 ? (
+      <div className="flex items-center gap-6">
+        <div style={{ width: 180, height: 180, flexShrink: 0 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={commissionBreakdown}
+                cx="50%"
+                cy="50%"
+                innerRadius={45}
+                outerRadius={80}
+                paddingAngle={2}
+                dataKey="value"
+                label={false}
+              >
+                {commissionBreakdown.map((_, idx) => (
+                  <Cell key={idx} fill={CHART_COLORS[idx % CHART_COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip formatter={(value: number) => formatNumber(value)} />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="flex flex-col gap-2 flex-1">
+          {commissionBreakdown.map((item, idx) => {
+            const total = commissionBreakdown.reduce((s, d) => s + d.value, 0);
+            const pct = total > 0 ? (item.value / total) * 100 : 0;
+            return (
+              <div key={idx} className="flex items-center gap-2 text-sm">
+                <span
+                  className="w-2.5 h-2.5 rounded-sm flex-shrink-0"
+                  style={{ backgroundColor: CHART_COLORS[idx % CHART_COLORS.length] }}
+                />
+                <span className="font-medium">{item.name}</span>
+                <span className="text-muted-foreground mr-auto">
+                  {toPersianDigits(pct.toFixed(0))}٪
+                </span>
               </div>
-            )}
-          </CardContent>
-        </Card>
+            );
+          })}
+        </div>
+      </div>
+    ) : (
+      <div className="py-16 text-center text-muted-foreground">
+        <Activity className="h-12 w-12 mx-auto mb-3 opacity-20" />
+        <p className="text-sm">نمودار پس از ثبت داده نمایش داده می‌شود</p>
+      </div>
+    )}
+  </CardContent>
+</Card>
       </div>
 
       {/* Top Performers */}

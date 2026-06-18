@@ -333,32 +333,63 @@ function ProportionalTieredTab({
         <Card className="rounded-2xl shadow-sm border overflow-hidden">
           <CardContent className="p-0">
             <div className="overflow-x-auto">
-              <Table className="table-zebra">
-                <TableHeader><TableRow className="bg-gradient-to-r from-violet-50/80 to-violet-50/30">
-                  <TableHead className="text-right font-semibold text-violet-800 text-xs">ردیف</TableHead>
-                  <TableHead className="text-right font-semibold text-violet-800 text-xs">فروشنده</TableHead>
-                  <TableHead className="text-right font-semibold text-violet-800 text-xs">مبلغ فروش</TableHead>
-                  <TableHead className="text-right font-semibold text-violet-800 text-xs">درصد موثر</TableHead>
-                  <TableHead className="text-right font-semibold text-violet-800 text-xs">پورسانت</TableHead>
-                  <TableHead className="text-right font-semibold text-violet-800 text-xs">عملیات</TableHead>
-                </TableRow></TableHeader>
-                <TableBody>
-                  {tieredCommissions.filter(tc => tc.mode === 'proportional' || !tc.mode).map((tc, idx) => {
-                   const effPct = getEffectiveTierPercentage(tc.salesAmount, tc.tiers || []);
-                    return (
-                      <TableRow key={tc.id}>
-                        <TableCell className="text-muted-foreground text-xs">{toPersianDigits(idx + 1)}</TableCell>
-                        <TableCell><div className="flex items-center gap-2"><div className="w-6 h-6 rounded-full bg-gradient-to-br from-violet-400 to-purple-500 text-white text-[10px] font-bold flex items-center justify-center shadow-sm">{(salesPersons.find(s => s.id === tc.salesPersonId)?.name || '?').charAt(0)}</div><span className="font-medium">{salesPersons.find(s => s.id === tc.salesPersonId)?.name || 'نامشخص'}</span></div></TableCell>
-                        <TableCell className="text-left font-mono tabular-nums" dir="ltr">{formatNumber(tc.salesAmount)}</TableCell>
-                        <TableCell><Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 font-mono">{formatPercent(Math.round(effPct * 10000) / 10000)}</Badge></TableCell>
-                        <TableCell className="font-bold text-violet-700 text-left font-mono tabular-nums" dir="ltr">{formatNumber(tc.commissionAmount)}</TableCell>
-                        <TableCell><Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-red-50 active:scale-90" 
-                        onClick={() => handleDelete(tc.id)}><Trash2 className="h-4 w-4" /></Button></TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
+            <Table className="table-zebra" dir="rtl">
+  <TableHeader>
+    <TableRow className="bg-gradient-to-r from-violet-50/80 to-violet-50/30">
+      <TableHead className="text-right font-semibold text-violet-800 text-xs">ردیف</TableHead>
+      <TableHead className="text-right font-semibold text-violet-800 text-xs">فروشنده</TableHead>
+      <TableHead className="text-right font-semibold text-violet-800 text-xs">مبلغ فروش</TableHead>
+      <TableHead className="text-right font-semibold text-violet-800 text-xs">درصد موثر</TableHead>
+      <TableHead className="text-right font-semibold text-violet-800 text-xs">پورسانت</TableHead>
+      <TableHead className="text-right font-semibold text-violet-800 text-xs">عملیات</TableHead>
+    </TableRow>
+  </TableHeader>
+  <TableBody>
+    {tieredCommissions.filter(tc => tc.mode === 'proportional' || !tc.mode).map((tc, idx) => {
+      const effPct = getEffectiveTierPercentage(tc.salesAmount, tc.tiers || []);
+      const salesPerson = salesPersons.find(s => s.id === tc.salesPersonId);
+      return (
+        <TableRow key={tc.id}>
+          <TableCell className="text-right text-xs">{toPersianDigits(idx + 1)}</TableCell>
+          
+          <TableCell className="text-right">
+  <div className="flex items-center justify-start gap-2">
+    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-violet-400 to-purple-500 text-white text-[10px] font-bold flex items-center justify-center shadow-sm flex-shrink-0">
+      {(salesPerson?.name || '?').charAt(0)}
+    </div>
+    <span className="font-medium">{salesPerson?.name || 'نامشخص'}</span>
+  </div>
+</TableCell>
+          
+          <TableCell className="text-right font-mono tabular-nums">
+            <span dir="ltr" style={{ unicodeBidi: 'isolate' }}>{formatNumber(tc.salesAmount)}</span>
+          </TableCell>
+          
+          <TableCell className="text-right">
+            <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 font-mono">
+              <span dir="ltr" style={{ unicodeBidi: 'isolate' }}>{formatPercent(Math.round(effPct * 10000) / 10000)}</span>
+            </Badge>
+          </TableCell>
+          
+          <TableCell className="text-right font-bold text-violet-700 font-mono tabular-nums">
+            <span dir="ltr" style={{ unicodeBidi: 'isolate' }}>{formatNumber(tc.commissionAmount)}</span>
+          </TableCell>
+          
+          <TableCell className="text-right">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-8 w-8 rounded-lg hover:bg-red-50 active:scale-90"
+              onClick={() => handleDelete(tc.id)}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </TableCell>
+        </TableRow>
+      );
+    })}
+  </TableBody>
+</Table>
             </div>
           </CardContent>
         </Card>
@@ -595,32 +626,58 @@ function SteppedTieredTab({
         <Card className="rounded-2xl shadow-sm border overflow-hidden">
           <CardContent className="p-0">
             <div className="overflow-x-auto">
-              <Table className="table-zebra">
-                <TableHeader><TableRow className="bg-gradient-to-r from-amber-50/80 to-orange-50/30">
-                  <TableHead className="text-right font-semibold text-amber-800 text-xs">ردیف</TableHead>
-                  <TableHead className="text-right font-semibold text-amber-800 text-xs">فروشنده</TableHead>
-                  <TableHead className="text-right font-semibold text-amber-800 text-xs">مبلغ فروش</TableHead>
-                  <TableHead className="text-right font-semibold text-amber-800 text-xs">درصد پله</TableHead>
-                  <TableHead className="text-right font-semibold text-amber-800 text-xs">پورسانت</TableHead>
-                  <TableHead className="text-right font-semibold text-amber-800 text-xs">عملیات</TableHead>
-                </TableRow></TableHeader>
-                <TableBody>
-                  {tieredCommissions.filter(tc => tc.mode === 'stepped').map((tc, idx) => {
-                    const pct = getSteppedTierPercentage(tc.salesAmount, tc.tiers || []);
-                    return (
-                      <TableRow key={tc.id}>
-                        <TableCell className="text-muted-foreground text-xs">{toPersianDigits(idx + 1)}</TableCell>
-                        <TableCell><div className="flex items-center gap-2"><div className="w-6 h-6 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-white text-[10px] font-bold flex items-center justify-center shadow-sm">{(salesPersons.find(s => s.id === tc.salesPersonId)?.name || '?').charAt(0)}</div><span className="font-medium">{salesPersons.find(s => s.id === tc.salesPersonId)?.name || 'نامشخص'}</span></div></TableCell>
-                        <TableCell className="text-left font-mono tabular-nums" dir="ltr">{formatNumber(tc.salesAmount)}</TableCell>
-                        <TableCell><Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 font-mono">{formatPercent(pct)}</Badge></TableCell>
-                        <TableCell className="font-bold text-amber-700 text-left font-mono tabular-nums" dir="ltr">{formatNumber(tc.commissionAmount)}</TableCell>
-                        <TableCell><Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-red-50 active:scale-90"
-                        onClick={() => handleDelete(tc.id)}><Trash2 className="h-4 w-4" /></Button></TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
+            <Table className="table-zebra" dir="rtl">
+  <TableHeader>
+    <TableRow className="bg-gradient-to-r from-amber-50/80 to-orange-50/30">
+      <TableHead className="text-right font-semibold text-amber-800 text-xs">ردیف</TableHead>
+      <TableHead className="text-right font-semibold text-amber-800 text-xs">فروشنده</TableHead>
+      <TableHead className="text-right font-semibold text-amber-800 text-xs">مبلغ فروش</TableHead>
+      <TableHead className="text-center font-semibold text-amber-800 text-xs">درصد پله</TableHead>
+      <TableHead className="text-right font-semibold text-amber-800 text-xs">پورسانت</TableHead>
+      <TableHead className="text-center font-semibold text-amber-800 text-xs">عملیات</TableHead>
+    </TableRow>
+  </TableHeader>
+  <TableBody>
+    {tieredCommissions.filter(tc => tc.mode === 'stepped').map((tc, idx) => {
+      const pct = getSteppedTierPercentage(tc.salesAmount, tc.tiers || []);
+      const salesPerson = salesPersons.find(s => s.id === tc.salesPersonId);
+      return (
+        <TableRow key={tc.id}>
+          <TableCell className="text-right text-xs">{toPersianDigits(idx + 1)}</TableCell>
+          <TableCell className="text-right">
+  <div className="flex items-center gap-2 justify-start">
+    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-white text-[10px] font-bold flex items-center justify-center shadow-sm flex-shrink-0">
+      {(salesPerson?.name || '?').charAt(0)}
+    </div>
+    <span className="font-medium">{salesPerson?.name || 'نامشخص'}</span>
+  </div>
+</TableCell>
+          <TableCell className="text-right font-mono tabular-nums">
+            <span dir="ltr" style={{ unicodeBidi: 'isolate' }}>{formatNumber(tc.salesAmount)}</span>
+          </TableCell>
+          <TableCell className="text-center">
+            <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 font-mono">
+              <span dir="ltr" style={{ unicodeBidi: 'isolate' }}>{formatPercent(pct)}</span>
+            </Badge>
+          </TableCell>
+          <TableCell className="text-right font-bold text-amber-700 font-mono tabular-nums">
+            <span dir="ltr" style={{ unicodeBidi: 'isolate' }}>{formatNumber(tc.commissionAmount)}</span>
+          </TableCell>
+          <TableCell className="text-center">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-8 w-8 rounded-lg hover:bg-red-50 active:scale-90"
+              onClick={() => handleDelete(tc.id)}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </TableCell>
+        </TableRow>
+      );
+    })}
+  </TableBody>
+</Table>
             </div>
           </CardContent>
         </Card>
