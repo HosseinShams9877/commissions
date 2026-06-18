@@ -1177,41 +1177,45 @@ const createSalesPersonMutation = useCreateSalesPerson();
             <Card className="rounded-2xl shadow-sm border overflow-hidden">
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
-                  <Table className="table-zebra">
-                    <TableHeader>
-                      <TableRow className="bg-gradient-to-r from-teal-50/80 to-teal-50/30">
-                        <TableHead className="text-right font-semibold text-teal-800 text-xs">ردیف</TableHead>
-                        <TableHead className="text-right font-semibold text-teal-800 text-xs">فروشنده</TableHead>
-                        <TableHead className="text-right font-semibold text-teal-800 text-xs">مبلغ وصول</TableHead>
-                        <TableHead className="text-right font-semibold text-teal-800 text-xs">تاریخ</TableHead>
-                        <TableHead className="text-right font-semibold text-teal-800 text-xs">شرح</TableHead>
-                        <TableHead className="text-right font-semibold text-teal-800 text-xs">عملیات</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {collections.map((c, idx) => (
-                        <TableRow key={c.id} className="transition-all duration-150">
-                          <TableCell className="text-muted-foreground text-xs">{toPersianDigits(idx + 1)}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-teal-400 to-cyan-500 text-white text-[10px] font-bold flex items-center justify-center shadow-sm">
-                                {getPersonName(c.salesPersonId).charAt(0)}
-                              </div>
-                              <span className="font-medium">{getPersonName(c.salesPersonId)}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="font-bold text-teal-700 text-left font-mono tabular-nums" dir="ltr">{formatNumber(c.amount)}</TableCell>
-                          <TableCell className="text-xs text-muted-foreground">{c.date || '−'}</TableCell>
-                          <TableCell className="text-xs text-muted-foreground">{c.description || '−'}</TableCell>
-                          <TableCell>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-red-50 hover:text-red-600 active:scale-90 transition-all" onClick={() => { if (confirm('آیا از حذف اطمینان دارید؟')) { deleteCollectionMutation.mutate({ id: c.id, year: currentPeriod.year, month: currentPeriod.month }); } }}>
-  <Trash2 className="h-4 w-4" />
-</Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                <Table className="table-zebra">
+  <TableHeader>
+    <TableRow className="bg-gradient-to-r from-teal-50/80 to-teal-50/30">
+      <TableHead className="text-right font-semibold text-teal-800 text-xs">ردیف</TableHead>
+      <TableHead className="text-right font-semibold text-teal-800 text-xs">فروشنده</TableHead>
+      <TableHead className="text-right font-semibold text-teal-800 text-xs">مبلغ وصول</TableHead>
+      <TableHead className="text-right font-semibold text-teal-800 text-xs">تاریخ</TableHead>
+      <TableHead className="text-right font-semibold text-teal-800 text-xs">شرح</TableHead>
+      <TableHead className="text-right font-semibold text-teal-800 text-xs">عملیات</TableHead>
+    </TableRow>
+  </TableHeader>
+  <TableBody>
+    {collections.map((c, idx) => (
+      <TableRow key={c.id} className="transition-all duration-150">
+        <TableCell className="text-muted-foreground text-xs">{toPersianDigits(idx + 1)}</TableCell>
+        <TableCell>
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-teal-400 to-cyan-500 text-white text-[10px] font-bold flex items-center justify-center shadow-sm">
+              {getPersonName(c.salesPersonId).charAt(0)}
+            </div>
+            <span className="font-medium">{getPersonName(c.salesPersonId)}</span>
+          </div>
+        </TableCell>
+        <TableCell className="font-bold text-teal-700 text-right font-mono tabular-nums">
+          <span dir="ltr" style={{ unicodeBidi: 'isolate' }}>{formatNumber(c.amount)}</span>
+        </TableCell>
+        <TableCell className="text-right text-xs text-muted-foreground">
+          <span dir="ltr" style={{ unicodeBidi: 'isolate' }}>{c.date || '−'}</span>
+        </TableCell>
+        <TableCell className="text-right text-xs text-muted-foreground">{c.description || '−'}</TableCell>
+        <TableCell>
+          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-red-50 hover:text-red-600 active:scale-90 transition-all" onClick={() => { if (confirm('آیا از حذف اطمینان دارید؟')) { deleteCollectionMutation.mutate({ id: c.id, year: currentPeriod.year, month: currentPeriod.month }); } }}>
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </TableCell>
+      </TableRow>
+    ))}
+  </TableBody>
+</Table>
                 </div>
               </CardContent>
             </Card>
@@ -1311,41 +1315,45 @@ const createSalesPersonMutation = useCreateSalesPerson();
             <Card className="rounded-2xl shadow-sm border overflow-hidden">
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
-                  <Table className="table-zebra">
-                    <TableHeader>
-                      <TableRow className="bg-gradient-to-r from-amber-50/80 to-amber-50/30">
-                        <TableHead className="text-right font-semibold text-amber-800 text-xs">ردیف</TableHead>
-                        <TableHead className="text-right font-semibold text-amber-800 text-xs">فروشنده</TableHead>
-                        <TableHead className="text-right font-semibold text-amber-800 text-xs">مبلغ تسویه</TableHead>
-                        <TableHead className="text-right font-semibold text-amber-800 text-xs">تاریخ</TableHead>
-                        <TableHead className="text-right font-semibold text-amber-800 text-xs">شرح</TableHead>
-                        <TableHead className="text-right font-semibold text-amber-800 text-xs">عملیات</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {settlements.map((st, idx) => (
-                        <TableRow key={st.id} className="transition-all duration-150">
-                          <TableCell className="text-muted-foreground text-xs">{toPersianDigits(idx + 1)}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-amber-400 to-yellow-500 text-white text-[10px] font-bold flex items-center justify-center shadow-sm">
-                                {getPersonName(st.salesPersonId).charAt(0)}
-                              </div>
-                              <span className="font-medium">{getPersonName(st.salesPersonId)}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="font-bold text-amber-700 text-left font-mono tabular-nums" dir="ltr">{formatNumber(st.amount)}</TableCell>
-                          <TableCell className="text-xs text-muted-foreground">{st.date || '−'}</TableCell>
-                          <TableCell className="text-xs text-muted-foreground">{st.description || '−'}</TableCell>
-                          <TableCell>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-red-50 hover:text-red-600 active:scale-90 transition-all" onClick={() => { if (confirm('آیا از حذف اطمینان دارید؟')) { deleteSettlementMutation.mutate({ id: st.id, year: currentPeriod.year, month: currentPeriod.month }); } }}>
-  <Trash2 className="h-4 w-4" />
-</Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                <Table className="table-zebra">
+  <TableHeader>
+    <TableRow className="bg-gradient-to-r from-amber-50/80 to-amber-50/30">
+      <TableHead className="text-right font-semibold text-amber-800 text-xs">ردیف</TableHead>
+      <TableHead className="text-right font-semibold text-amber-800 text-xs">فروشنده</TableHead>
+      <TableHead className="text-right font-semibold text-amber-800 text-xs">مبلغ تسویه</TableHead>
+      <TableHead className="text-right font-semibold text-amber-800 text-xs">تاریخ</TableHead>
+      <TableHead className="text-right font-semibold text-amber-800 text-xs">شرح</TableHead>
+      <TableHead className="text-right font-semibold text-amber-800 text-xs">عملیات</TableHead>
+    </TableRow>
+  </TableHeader>
+  <TableBody>
+    {settlements.map((st, idx) => (
+      <TableRow key={st.id} className="transition-all duration-150">
+        <TableCell className="text-muted-foreground text-xs">{toPersianDigits(idx + 1)}</TableCell>
+        <TableCell>
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-amber-400 to-yellow-500 text-white text-[10px] font-bold flex items-center justify-center shadow-sm">
+              {getPersonName(st.salesPersonId).charAt(0)}
+            </div>
+            <span className="font-medium">{getPersonName(st.salesPersonId)}</span>
+          </div>
+        </TableCell>
+        <TableCell className="font-bold text-amber-700 text-right font-mono tabular-nums">
+          <span dir="ltr" style={{ unicodeBidi: 'isolate' }}>{formatNumber(st.amount)}</span>
+        </TableCell>
+        <TableCell className="text-right text-xs text-muted-foreground">
+          <span dir="ltr" style={{ unicodeBidi: 'isolate' }}>{st.date || '−'}</span>
+        </TableCell>
+        <TableCell className="text-right text-xs text-muted-foreground">{st.description || '−'}</TableCell>
+        <TableCell>
+          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-red-50 hover:text-red-600 active:scale-90 transition-all" onClick={() => { if (confirm('آیا از حذف اطمینان دارید؟')) { deleteSettlementMutation.mutate({ id: st.id, year: currentPeriod.year, month: currentPeriod.month }); } }}>
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </TableCell>
+      </TableRow>
+    ))}
+  </TableBody>
+</Table>
                 </div>
               </CardContent>
             </Card>

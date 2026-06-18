@@ -210,42 +210,48 @@ const handleDelete = (id: string) => {
         <Card className="rounded-2xl shadow-sm border overflow-hidden">
           <CardContent className="p-0">
             <div className="overflow-x-auto">
-              <Table className="table-zebra">
-                <TableHeader>
-                  <TableRow className="bg-gradient-to-r from-emerald-50/80 to-emerald-50/30 hover:bg-gradient-to-r hover:from-emerald-50/80 hover:to-emerald-50/30">
-                    <TableHead className="text-right font-semibold text-emerald-800 text-xs">ردیف</TableHead>
-                    <TableHead className="text-right font-semibold text-emerald-800 text-xs">نام فروشنده</TableHead>
-                    <TableHead className="text-right font-semibold text-emerald-800 text-xs">مبلغ فروش</TableHead>
-                    <TableHead className="text-right font-semibold text-emerald-800 text-xs">درصد</TableHead>
-                    <TableHead className="text-right font-semibold text-emerald-800 text-xs">مبلغ پورسانت</TableHead>
-                    <TableHead className="text-right font-semibold text-emerald-800 text-xs">عملیات</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {percentageCommissions.map((pc, idx) => (
-                    <TableRow key={pc.id} className="transition-all duration-150">
-                      <TableCell className="text-muted-foreground text-xs">{toPersianDigits(idx + 1)}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 text-white text-[10px] font-bold flex items-center justify-center shadow-sm">
-                            {getSalesPersonName(pc.salesPersonId).charAt(0)}
-                          </div>
-                          <span className="font-medium">{getSalesPersonName(pc.salesPersonId)}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-left font-mono tabular-nums" dir="ltr">{formatNumber(pc.salesAmount)}</TableCell>
-                      <TableCell>{formatPercent(pc.percentage)}</TableCell>
-                      <TableCell className="font-bold text-emerald-700 text-left font-mono tabular-nums" dir="ltr">{formatNumber(pc.commissionAmount)}</TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-red-50 hover:text-red-600 active:scale-90 transition-all"
-                         onClick={() => handleDelete(pc.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+            <Table className="table-zebra">
+  <TableHeader>
+    <TableRow className="bg-gradient-to-r from-emerald-50/80 to-emerald-50/30 hover:bg-gradient-to-r hover:from-emerald-50/80 hover:to-emerald-50/30">
+      <TableHead className="text-right font-semibold text-emerald-800 text-xs">ردیف</TableHead>
+      <TableHead className="text-right font-semibold text-emerald-800 text-xs">نام فروشنده</TableHead>
+      <TableHead className="text-right font-semibold text-emerald-800 text-xs">مبلغ فروش</TableHead>
+      <TableHead className="text-right font-semibold text-emerald-800 text-xs">درصد</TableHead>
+      <TableHead className="text-right font-semibold text-emerald-800 text-xs">مبلغ پورسانت</TableHead>
+      <TableHead className="text-right font-semibold text-emerald-800 text-xs">عملیات</TableHead>
+    </TableRow>
+  </TableHeader>
+  <TableBody>
+    {percentageCommissions.map((pc, idx) => (
+      <TableRow key={pc.id} className="transition-all duration-150">
+        <TableCell className="text-muted-foreground text-xs">{toPersianDigits(idx + 1)}</TableCell>
+        <TableCell>
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 text-white text-[10px] font-bold flex items-center justify-center shadow-sm">
+              {getSalesPersonName(pc.salesPersonId).charAt(0)}
+            </div>
+            <span className="font-medium">{getSalesPersonName(pc.salesPersonId)}</span>
+          </div>
+        </TableCell>
+        <TableCell className="text-right font-mono tabular-nums">
+          <span dir="ltr" style={{ unicodeBidi: 'isolate' }}>{formatNumber(pc.salesAmount)}</span>
+        </TableCell>
+        <TableCell className="text-right">
+          <span dir="ltr" style={{ unicodeBidi: 'isolate' }}>{formatPercent(pc.percentage)}</span>
+        </TableCell>
+        <TableCell className="font-bold text-emerald-700 text-right font-mono tabular-nums">
+          <span dir="ltr" style={{ unicodeBidi: 'isolate' }}>{formatNumber(pc.commissionAmount)}</span>
+        </TableCell>
+        <TableCell>
+          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-red-50 hover:text-red-600 active:scale-90 transition-all"
+           onClick={() => handleDelete(pc.id)}>
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </TableCell>
+      </TableRow>
+    ))}
+  </TableBody>
+</Table>
             </div>
           </CardContent>
         </Card>
