@@ -27,6 +27,7 @@ import { ExcelImport, ImportColumn } from './excel-import';
 const TIERED_IMPORT_COLUMNS: ImportColumn[] = [
   { key: 'name', label: 'نام فروشنده', required: true, type: 'string' },
   { key: 'code', label: 'کد فروشنده', required: false, type: 'string' },
+  { key: 'days', label: 'بازه روزانه', required: false, type: 'number' },
   { key: 'salesAmount', label: 'مبلغ فروش', required: true, type: 'number' },
 ];
 
@@ -45,7 +46,7 @@ const DEFAULT_TIERS_STEPPED: Tier[] = [
 
 export function TieredCommissionTab() {
   const { currentPeriod } = useCommissionStore();
-  
+  const [days, setDays] = useState('');
   const { data: salesPersonsData } = useSalesPersons();
   const { data: tieredData } = useTieredCommissionsData(currentPeriod.year, currentPeriod.month);
   
@@ -77,6 +78,8 @@ export function TieredCommissionTab() {
     createTieredCommission={createTieredCommission}
     deleteTieredCommission={deleteTieredCommission}
     createSalesPerson={createSalesPerson}
+    days={days}              
+    setDays={setDays} 
   />
 </TabsContent>
 <TabsContent value="stepped">
@@ -87,6 +90,8 @@ export function TieredCommissionTab() {
     createTieredCommission={createTieredCommission}
     deleteTieredCommission={deleteTieredCommission}
     createSalesPerson={createSalesPerson}
+    days={days}             
+    setDays={setDays}
   />
 </TabsContent>
     </Tabs>
@@ -100,6 +105,8 @@ function ProportionalTieredTab({
   createTieredCommission, 
   deleteTieredCommission,
   createSalesPerson,
+  days,       
+  setDays,
 }: {
   salesPersons: { id: string; name: string; code: string }[];
   currentPeriod: { year: number; month: number };
@@ -107,6 +114,8 @@ function ProportionalTieredTab({
   createTieredCommission: any;
   deleteTieredCommission: any;
   createSalesPerson: any;
+  days: string;     
+  setDays: (v: string) => void;
 }) {
   const [salesPersonId, setSalesPersonId] = useState('');
   const [salesAmount, setSalesAmount] = useState('');
@@ -117,13 +126,13 @@ function ProportionalTieredTab({
   const handleExcelImport = async (rows: Record<string, string | number>[]) => {
     let successCount = 0;
     let errorCount = 0;
-  
+    
     for (const row of rows) {
       try {
         const name = String(row.name || '').trim();
         const code = String(row.code || '').trim() || name;
         const salesAmount = Number(row.salesAmount) || 0;
-        
+        const days = row.days ? Number(row.days) : undefined;
         if (!name || salesAmount <= 0) {
           errorCount++;
           continue;
@@ -153,6 +162,7 @@ function ProportionalTieredTab({
             await createTieredCommission.mutateAsync({
               salesPersonId: personId,
               salesAmount,
+              days: days,
               tiers,
               mode: 'proportional',
               periodYear: currentPeriod.year,
@@ -212,6 +222,7 @@ function ProportionalTieredTab({
     createTieredCommission.mutate({
       salesPersonId,
       salesAmount: parseFloat(salesAmount),
+      days: days ? parseInt(days) : undefined,
       tiers,
       mode: 'proportional',
       periodYear: currentPeriod.year,
@@ -263,6 +274,17 @@ function ProportionalTieredTab({
               <label className="text-sm font-semibold text-gray-700">مبلغ فروش (ریال)</label>
               <Input type="number" value={salesAmount} onChange={(e) => setSalesAmount(e.target.value)} placeholder="مبلغ فروش" dir="ltr" className="text-left font-mono tabular-nums focus-visible:ring-violet-500/30 focus-visible:border-violet-500" />
             </div>
+            <div className="flex flex-col gap-1.5">
+  <label className="text-sm font-semibold text-gray-700">تعداد روز (اختیاری)</label>
+  <Input
+    type="number"
+    value={days}
+    onChange={(e) => setDays(e.target.value)}
+    placeholder="مثلاً ۳۰"
+    dir="ltr"
+    className="text-left font-mono"
+  />
+</div>
           </div>
 
           {salesAmountNum > 0 && (
@@ -301,16 +323,41 @@ function ProportionalTieredTab({
               <Button variant="outline" size="sm" onClick={addTier} className="gap-1 border-violet-300 text-violet-700 hover:bg-violet-50 rounded-lg"><Plus className="h-3 w-3" />افزودن پله</Button>
             </div>
             {tiers.map((tier, idx) => {
-              const isActive = idx === activeTierIndex && salesAmountNum > 0;
-              return (
-                <div key={tier.id || idx} className={cn('grid grid-cols-2 sm:grid-cols-4 gap-2 items-center rounded-lg border p-3 shadow-sm transition-all', isActive ? 'bg-violet-50 border-violet-300 ring-2 ring-violet-300/30' : 'bg-white border-violet-100')}>
-                  <div className="flex flex-col gap-1"><label className="text-xs text-muted-foreground">از مبلغ</label><Input type="number" value={tier.fromAmount || ''} onChange={(e) => updateTier(tier.id!, 'fromAmount', parseFloat(e.target.value) || 0)} className="text-sm text-left font-mono" dir="ltr" /></div>
-                  <div className="flex flex-col gap-1"><label className="text-xs text-muted-foreground">تا مبلغ {tier.toAmount === 0 && '(∞)'}</label><Input type="number" value={tier.toAmount || ''} onChange={(e) => updateTier(tier.id!, 'toAmount', parseFloat(e.target.value) || 0)} className="text-sm text-left font-mono" dir="ltr" /></div>
-                  <div className="flex flex-col gap-1"><label className="text-xs text-muted-foreground">درصد انتهای پله</label><Input type="number" value={tier.percentage || ''} onChange={(e) => updateTier(tier.id!, 'percentage', parseFloat(e.target.value) || 0)} className="text-sm text-left font-mono" dir="ltr" step="0.1" /></div>
-                  <div className="flex items-center justify-center"><Button variant="ghost" size="icon" className="h-9 w-9 rounded-lg hover:bg-red-50 active:scale-90" onClick={() => removeTier(tier.id!)} disabled={tiers.length <= 1}><X className="h-4 w-4 text-red-400" /></Button></div>
-                </div>
-              );
-            })}
+  const isActive = idx === activeTierIndex && salesAmountNum > 0;
+  return (
+    <div key={tier.id || idx} className={cn('grid grid-cols-2 sm:grid-cols-5 gap-2 items-center rounded-lg border p-3 shadow-sm transition-all', isActive ? 'bg-violet-50 border-violet-300 ring-2 ring-violet-300/30' : 'bg-white border-violet-100')}>
+      <div className="flex flex-col gap-1">
+        <label className="text-xs text-muted-foreground">از مبلغ</label>
+        <Input type="number" value={tier.fromAmount || ''} onChange={(e) => updateTier(tier.id!, 'fromAmount', parseFloat(e.target.value) || 0)} className="text-sm text-left font-mono" dir="ltr" />
+      </div>
+      <div className="flex flex-col gap-1">
+        <label className="text-xs text-muted-foreground">تا مبلغ {tier.toAmount === 0 && '(∞)'}</label>
+        <Input type="number" value={tier.toAmount || ''} onChange={(e) => updateTier(tier.id!, 'toAmount', parseFloat(e.target.value) || 0)} className="text-sm text-left font-mono" dir="ltr" />
+      </div>
+      {/* ✅ اینجا رو اضافه کن */}
+      <div className="flex flex-col gap-1">
+        <label className="text-xs text-muted-foreground">بازه روزانه</label>
+        <Input
+          type="number"
+          value={tier.daysRange || ''}
+          onChange={(e) => updateTier(tier.id!, 'daysRange', e.target.value ? parseInt(e.target.value) : null)}
+          placeholder="مثلاً ۳۰"
+          className="text-sm text-left font-mono"
+          dir="ltr"
+        />
+      </div>
+      <div className="flex flex-col gap-1">
+        <label className="text-xs text-muted-foreground">درصد انتهای پله</label>
+        <Input type="number" value={tier.percentage || ''} onChange={(e) => updateTier(tier.id!, 'percentage', parseFloat(e.target.value) || 0)} className="text-sm text-left font-mono" dir="ltr" step="0.1" />
+      </div>
+      <div className="flex items-center justify-center">
+        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-lg hover:bg-red-50 active:scale-90" onClick={() => removeTier(tier.id!)} disabled={tiers.length <= 1}>
+          <X className="h-4 w-4 text-red-400" />
+        </Button>
+      </div>
+    </div>
+  );
+})}
           </div>
 
           <Button onClick={handleAdd} disabled={!salesPersonId || !salesAmount}
@@ -405,6 +452,8 @@ function SteppedTieredTab({
   createTieredCommission, 
   deleteTieredCommission,
   createSalesPerson,
+  days, 
+  setDays,
 }: {
   salesPersons: { id: string; name: string; code: string }[];
   currentPeriod: { year: number; month: number };
@@ -412,6 +461,8 @@ function SteppedTieredTab({
   createTieredCommission: any;
   deleteTieredCommission: any;
   createSalesPerson: any;
+  days: string;      
+  setDays: (v: string) => void;
 }) {
   const [salesPersonId, setSalesPersonId] = useState('');
   const [salesAmount, setSalesAmount] = useState('');
@@ -428,7 +479,7 @@ function SteppedTieredTab({
         const name = String(row.name || '').trim();
         const code = String(row.code || '').trim() || name;
         const salesAmount = Number(row.salesAmount) || 0;
-        
+        const days = row.days ? Number(row.days) : undefined;
         if (!name || salesAmount <= 0) {
           errorCount++;
           continue;
@@ -459,6 +510,7 @@ function SteppedTieredTab({
               salesPersonId: personId,
               salesAmount,
               tiers,
+              days: days,
               mode: 'stepped',
               periodYear: currentPeriod.year,
               periodMonth: currentPeriod.month,
@@ -504,12 +556,13 @@ function SteppedTieredTab({
     createTieredCommission.mutate({
       salesPersonId,
       salesAmount: parseFloat(salesAmount),
+      days: days ? parseInt(days) : undefined,
       tiers,
       mode: 'stepped',
       periodYear: currentPeriod.year,
       periodMonth: currentPeriod.month,
     });
-    setSalesPersonId(''); setSalesAmount('');
+    setSalesPersonId(''); setSalesAmount(''); setDays(''); 
   };
 
   const handleDelete = (id: string) => {
@@ -555,6 +608,17 @@ function SteppedTieredTab({
               <label className="text-sm font-semibold text-gray-700">مبلغ فروش (ریال)</label>
               <Input type="number" value={salesAmount} onChange={(e) => setSalesAmount(e.target.value)} placeholder="مبلغ فروش" dir="ltr" className="text-left font-mono tabular-nums focus-visible:ring-amber-500/30 focus-visible:border-amber-500" />
             </div>
+            <div className="flex flex-col gap-1.5">
+      <label className="text-sm font-semibold text-gray-700">تعداد روز (اختیاری)</label>
+      <Input
+        type="number"
+        value={days}
+        onChange={(e) => setDays(e.target.value)}
+        placeholder="مثلاً ۳۰"
+        dir="ltr"
+        className="text-left font-mono"
+      />
+    </div>
           </div>
 
           {salesAmountNum > 0 && (
@@ -591,6 +655,18 @@ function SteppedTieredTab({
                 <div key={tier.id || idx} className={cn('grid grid-cols-2 sm:grid-cols-4 gap-2 items-center rounded-lg border p-3 shadow-sm transition-all', isActive ? 'bg-amber-50 border-amber-300 ring-2 ring-amber-300/30' : 'bg-white border-amber-100')}>
                   <div className="flex flex-col gap-1"><label className="text-xs text-muted-foreground">از مبلغ</label><Input type="number" value={tier.fromAmount || ''} onChange={(e) => updateTier(tier.id!, 'fromAmount', parseFloat(e.target.value) || 0)} className="text-sm text-left font-mono" dir="ltr" /></div>
                   <div className="flex flex-col gap-1"><label className="text-xs text-muted-foreground">تا مبلغ {tier.toAmount === 0 && '(∞)'}</label><Input type="number" value={tier.toAmount || ''} onChange={(e) => updateTier(tier.id!, 'toAmount', parseFloat(e.target.value) || 0)} className="text-sm text-left font-mono" dir="ltr" /></div>
+                 
+<div className="flex flex-col gap-1">
+  <label className="text-xs text-muted-foreground">بازه روزانه</label>
+  <Input
+    type="number"
+    value={tier.daysRange || ''}
+    onChange={(e) => updateTier(tier.id!, 'daysRange', e.target.value ? parseInt(e.target.value) : null)}
+    placeholder="مثلاً ۳۰"
+    className="text-sm text-left font-mono"
+    dir="ltr"
+  />
+</div>
                   <div className="flex flex-col gap-1"><label className="text-xs text-muted-foreground">درصد پله</label><Input type="number" value={tier.percentage || ''} onChange={(e) => updateTier(tier.id!, 'percentage', parseFloat(e.target.value) || 0)} className="text-sm text-left font-mono" dir="ltr" step="0.1" /></div>
                   <div className="flex items-center justify-center gap-2">
                     <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-[11px] font-mono">{formatPercent(tier.percentage)}</Badge>

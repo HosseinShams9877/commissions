@@ -21,6 +21,7 @@ export interface Tier {
   fromAmount: number;
   toAmount: number; // 0 means infinity
   percentage: number;
+  daysRange?: number | null;
 }
 
 export interface TieredCommission {

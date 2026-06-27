@@ -92,6 +92,7 @@ model TieredCommission {
   commissionAmount Float
   mode            String   @default("proportional") // proportional | stepped
   tiersJson       String   // JSON string of Tier[]
+  days            Int?
   createdAt       DateTime @default(now())
 
   salesPerson SalesPerson @relation(fields: [salesPersonId], references: [id], onDelete: Cascade)
