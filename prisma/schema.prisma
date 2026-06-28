@@ -92,6 +92,7 @@ model TieredCommission {
   commissionAmount Float
   mode            String   @default("proportional") // proportional | stepped
   tiersJson       String   // JSON string of Tier[]
+  effectivePercentage Float?  // ✅ اضافه کن - درصد موثر محاسبه‌شده
   days            Int?
   createdAt       DateTime @default(now())
 

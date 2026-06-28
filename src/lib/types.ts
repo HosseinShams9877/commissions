@@ -31,6 +31,8 @@ export interface TieredCommission {
   commissionAmount: number;
   tiers: Tier[];
   mode: 'proportional' | 'stepped';
+  days?: number | null;      
+  effectivePercentage?: number | null;
 }
 
 export interface FinderFee {

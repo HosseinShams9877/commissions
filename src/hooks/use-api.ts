@@ -384,7 +384,7 @@ export function useCreateTieredCommission() {
   return useMutation<
     TieredCommissionResponse,
     Error,
-    Omit<TieredCommission, 'id' | 'commissionAmount'> & { periodYear: number; periodMonth: number }
+    Omit<TieredCommission, 'id' | 'commissionAmount'> & { periodYear: number; periodMonth: number ;effectivePercentage?: number | null;}
   >({
     mutationFn: (data) => apiClient.post<TieredCommissionResponse>('/tiered-commissions', data),
     onSuccess: (_data, variables) => {

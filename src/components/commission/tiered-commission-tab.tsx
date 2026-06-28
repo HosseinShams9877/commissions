@@ -27,7 +27,7 @@ import { ExcelImport, ImportColumn } from './excel-import';
 const TIERED_IMPORT_COLUMNS: ImportColumn[] = [
   { key: 'name', label: 'نام فروشنده', required: true, type: 'string' },
   { key: 'code', label: 'کد فروشنده', required: false, type: 'string' },
-  { key: 'days', label: 'بازه روزانه', required: false, type: 'number' },
+  { key: 'days', label: 'مدت زمان وصول', required: false, type: 'number' },
   { key: 'salesAmount', label: 'مبلغ فروش', required: true, type: 'number' },
 ];
 
@@ -218,17 +218,24 @@ function ProportionalTieredTab({
   const updateTier = (id: string, field: keyof Tier, value: number) => { setTiers(tiers.map(t => t.id === id ? { ...t, [field]: value } : t)); };
 
   const handleAdd = () => {
+
+    const effPct = getEffectiveTierPercentage(
+      parseFloat(salesAmount), 
+      tiers, 
+      days ? parseInt(days) : undefined
+    );
     if (!salesPersonId || !salesAmount || tiers.length === 0) return;
     createTieredCommission.mutate({
       salesPersonId,
       salesAmount: parseFloat(salesAmount),
+      effectivePercentage: effPct,
       days: days ? parseInt(days) : undefined,
       tiers,
       mode: 'proportional',
       periodYear: currentPeriod.year,
       periodMonth: currentPeriod.month,
     });
-    setSalesPersonId(''); setSalesAmount('');
+    setSalesPersonId(''); setSalesAmount('');setDays('');
   };
 
   const handleDelete = (id: string) => {
@@ -336,7 +343,7 @@ function ProportionalTieredTab({
       </div>
       {/* ✅ اینجا رو اضافه کن */}
       <div className="flex flex-col gap-1">
-        <label className="text-xs text-muted-foreground">بازه روزانه</label>
+        <label className="text-xs text-muted-foreground">مدت زمان وصول </label>
         <Input
           type="number"
           value={tier.daysRange || ''}
@@ -393,7 +400,9 @@ function ProportionalTieredTab({
   </TableHeader>
   <TableBody>
     {tieredCommissions.filter(tc => tc.mode === 'proportional' || !tc.mode).map((tc, idx) => {
-      const effPct = getEffectiveTierPercentage(tc.salesAmount, tc.tiers || []);
+      
+     const effPct = tc.effectivePercentage ?? 
+     (tc.salesAmount > 0 ? (tc.commissionAmount / tc.salesAmount) * 100 : 0);
       const salesPerson = salesPersons.find(s => s.id === tc.salesPersonId);
       return (
         <TableRow key={tc.id}>
@@ -552,11 +561,17 @@ function SteppedTieredTab({
   const updateTier = (id: string, field: keyof Tier, value: number) => { setTiers(tiers.map(t => t.id === id ? { ...t, [field]: value } : t)); };
 
   const handleAdd = () => {
+    const effPct = getEffectiveTierPercentage(
+      parseFloat(salesAmount), 
+      tiers, 
+      days ? parseInt(days) : undefined
+    );
     if (!salesPersonId || !salesAmount || tiers.length === 0) return;
     createTieredCommission.mutate({
       salesPersonId,
       salesAmount: parseFloat(salesAmount),
       days: days ? parseInt(days) : undefined,
+      effectivePercentage: effPct,
       tiers,
       mode: 'stepped',
       periodYear: currentPeriod.year,
@@ -657,7 +672,7 @@ function SteppedTieredTab({
                   <div className="flex flex-col gap-1"><label className="text-xs text-muted-foreground">تا مبلغ {tier.toAmount === 0 && '(∞)'}</label><Input type="number" value={tier.toAmount || ''} onChange={(e) => updateTier(tier.id!, 'toAmount', parseFloat(e.target.value) || 0)} className="text-sm text-left font-mono" dir="ltr" /></div>
                  
 <div className="flex flex-col gap-1">
-  <label className="text-xs text-muted-foreground">بازه روزانه</label>
+  <label className="text-xs text-muted-foreground">مدت زمان وصول</label>
   <Input
     type="number"
     value={tier.daysRange || ''}
@@ -715,8 +730,10 @@ function SteppedTieredTab({
   </TableHeader>
   <TableBody>
     {tieredCommissions.filter(tc => tc.mode === 'stepped').map((tc, idx) => {
-      const pct = getSteppedTierPercentage(tc.salesAmount, tc.tiers || []);
-      const salesPerson = salesPersons.find(s => s.id === tc.salesPersonId);
+       const effPct = tc.effectivePercentage ?? 
+       (tc.salesAmount > 0 ? (tc.commissionAmount / tc.salesAmount) * 100 : 0);
+        const salesPerson = salesPersons.find(s => s.id === tc.salesPersonId);
+     
       return (
         <TableRow key={tc.id}>
           <TableCell className="text-right text-xs">{toPersianDigits(idx + 1)}</TableCell>
@@ -733,7 +750,7 @@ function SteppedTieredTab({
           </TableCell>
           <TableCell className="text-center">
             <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 font-mono">
-              <span dir="ltr" style={{ unicodeBidi: 'isolate' }}>{formatPercent(pct)}</span>
+              <span dir="ltr" style={{ unicodeBidi: 'isolate' }}>{formatPercent(effPct)}</span>
             </Badge>
           </TableCell>
           <TableCell className="text-right font-bold text-amber-700 font-mono tabular-nums">
