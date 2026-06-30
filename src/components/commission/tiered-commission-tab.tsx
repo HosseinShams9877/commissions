@@ -189,16 +189,50 @@ function ProportionalTieredTab({
   };
 
   const salesAmountNum = parseFloat(salesAmount) || 0;
-  const effectivePercentage = useMemo(() => getEffectiveTierPercentage(salesAmountNum, tiers), [salesAmountNum, tiers]);
-
+  const effectivePercentage = useMemo(() => {
+    return getEffectiveTierPercentage(
+      salesAmountNum, 
+      tiers, 
+      days ? parseInt(days) : undefined
+    );
+  }, [salesAmountNum, tiers, days]);
   const activeTierIndex = useMemo(() => {
-    for (let i = 0; i < tiers.length; i++) {
-      const to = tiers[i].toAmount === 0 ? Infinity : tiers[i].toAmount;
-      if (salesAmountNum >= tiers[i].fromAmount && salesAmountNum < to) return i;
+    // ✅ اول پله‌های مناسب رو بر اساس days پیدا کن
+    const tiersWithDays = tiers.filter(t => t.daysRange !== undefined && t.daysRange !== null && t.daysRange > 0);
+    const tiersWithoutDays = tiers.filter(t => t.daysRange === undefined || t.daysRange === null || t.daysRange === 0);
+    
+    let selectedTiers: Tier[] = [];
+    const daysNum = days ? parseInt(days) : undefined;
+  
+    if (daysNum !== undefined && daysNum > 0) {
+      const matchedTiers = tiersWithDays.filter(t => daysNum <= t.daysRange);
+      if (matchedTiers.length > 0) {
+        const sortedMatched = [...matchedTiers].sort((a, b) => Number(a.daysRange) - Number(b.daysRange));
+        selectedTiers = [sortedMatched[0]];
+      } else {
+        selectedTiers = tiersWithoutDays;
+      }
+    } else {
+      selectedTiers = tiersWithoutDays;
     }
-    if (tiers.length > 0 && salesAmountNum >= tiers[tiers.length - 1].fromAmount) return tiers.length - 1;
+  
+    if (selectedTiers.length === 0) {
+      selectedTiers = tiers;
+    }
+  
+    // ✅ پیدا کردن پله فعال از بین selectedTiers
+    for (let i = 0; i < selectedTiers.length; i++) {
+      const to = selectedTiers[i].toAmount === 0 ? Infinity : selectedTiers[i].toAmount;
+      if (salesAmountNum >= selectedTiers[i].fromAmount && salesAmountNum < to) {
+        // پیدا کردن ایندکس اصلی در tiers
+        return tiers.findIndex(t => t.id === selectedTiers[i].id);
+      }
+    }
+    if (selectedTiers.length > 0 && salesAmountNum >= selectedTiers[selectedTiers.length - 1].fromAmount) {
+      return tiers.findIndex(t => t.id === selectedTiers[selectedTiers.length - 1].id);
+    }
     return -1;
-  }, [salesAmountNum, tiers]);
+  }, [salesAmountNum, tiers, days]);  // ← days رو اضافه کن
 
   const tierProgress = useMemo(() => {
     if (activeTierIndex < 0 || salesAmountNum <= 0) return 0;
@@ -212,7 +246,7 @@ function ProportionalTieredTab({
   const addTier = () => {
     const lastTier = tiers[tiers.length - 1];
     const newFrom = lastTier.toAmount === 0 ? lastTier.fromAmount + 10000000 : lastTier.toAmount;
-    setTiers([...tiers, { id: generateTierId(), fromAmount: newFrom, toAmount: 0, percentage: 0 }]);
+    setTiers([...tiers, { id: generateTierId(), fromAmount: newFrom, toAmount: 0, percentage: 0,daysRange: null }]);
   };
   const removeTier = (id: string) => { if (tiers.length <= 1) return; setTiers(tiers.filter(t => t.id !== id)); };
   const updateTier = (id: string, field: keyof Tier, value: number) => { setTiers(tiers.map(t => t.id === id ? { ...t, [field]: value } : t)); };
@@ -545,27 +579,61 @@ function SteppedTieredTab({
   };
 
   const salesAmountNum = parseFloat(salesAmount) || 0;
-  const steppedPercentage = useMemo(() => getSteppedTierPercentage(salesAmountNum, tiers), [salesAmountNum, tiers]);
-
+  const steppedPercentage = useMemo(() => {
+    return getSteppedTierPercentage(
+      salesAmountNum, 
+      tiers, 
+      days ? parseInt(days) : undefined
+    );
+  }, [salesAmountNum, tiers, days]);
   const activeTierIndex = useMemo(() => {
-    for (let i = tiers.length - 1; i >= 0; i--) { if (salesAmountNum >= tiers[i].fromAmount) return i; }
+    // ✅ اول پله‌های مناسب رو بر اساس days پیدا کن
+    const tiersWithDays = tiers.filter(t => t.daysRange !== undefined && t.daysRange !== null && t.daysRange > 0);
+    const tiersWithoutDays = tiers.filter(t => t.daysRange === undefined || t.daysRange === null || t.daysRange === 0);
+    
+    let selectedTiers: Tier[] = [];
+    const daysNum = days ? parseInt(days) : undefined;
+  
+    if (daysNum !== undefined && daysNum > 0) {
+      const matchedTiers = tiersWithDays.filter(t => daysNum <= t.daysRange);
+      if (matchedTiers.length > 0) {
+        const sortedMatched = [...matchedTiers].sort((a, b) => Number(a.daysRange) - Number(b.daysRange));
+        selectedTiers = [sortedMatched[0]];
+      } else {
+        selectedTiers = tiersWithoutDays;
+      }
+    } else {
+      selectedTiers = tiersWithoutDays;
+    }
+  
+    if (selectedTiers.length === 0) {
+      selectedTiers = tiers;
+    }
+  
+    // ✅ برای سقفی: از آخر به اول
+    for (let i = selectedTiers.length - 1; i >= 0; i--) {
+      if (salesAmountNum >= selectedTiers[i].fromAmount) {
+        return tiers.findIndex(t => t.id === selectedTiers[i].id);
+      }
+    }
     return -1;
-  }, [salesAmountNum, tiers]);
+  }, [salesAmountNum, tiers, days]);  
 
   const addTier = () => {
     const lastTier = tiers[tiers.length - 1];
     const newFrom = lastTier.toAmount === 0 ? lastTier.fromAmount + 10000000 : lastTier.toAmount;
-    setTiers([...tiers, { id: generateTierId(), fromAmount: newFrom, toAmount: 0, percentage: lastTier.percentage + 1 }]);
+    setTiers([...tiers, { id: generateTierId(), fromAmount: newFrom, toAmount: 0, percentage: lastTier.percentage + 1,  daysRange: null}]);
   };
   const removeTier = (id: string) => { if (tiers.length <= 1) return; setTiers(tiers.filter(t => t.id !== id)); };
   const updateTier = (id: string, field: keyof Tier, value: number) => { setTiers(tiers.map(t => t.id === id ? { ...t, [field]: value } : t)); };
 
   const handleAdd = () => {
-    const effPct = getEffectiveTierPercentage(
+    const effPct = getSteppedTierPercentage(
       parseFloat(salesAmount), 
       tiers, 
       days ? parseInt(days) : undefined
     );
+   
     if (!salesPersonId || !salesAmount || tiers.length === 0) return;
     createTieredCommission.mutate({
       salesPersonId,

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { calculateTieredCommission } from '@/lib/commission-calculations';
 
 export async function GET(request: NextRequest) {
   try {
@@ -35,7 +36,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { salesPersonId, salesAmount, tiers, mode, periodYear, periodMonth } = body;
+    const { salesPersonId, salesAmount, tiers, mode, periodYear, periodMonth,effectivePercentage, 
+    days } = body;
 
     if (!salesPersonId || !salesAmount || !tiers || !mode || !periodYear || !periodMonth) {
       return NextResponse.json(
@@ -45,8 +47,17 @@ export async function POST(request: NextRequest) {
     }
 
     const tiersJson = JSON.stringify(tiers);
-    const lastTier = tiers[tiers.length - 1];
-    const commissionAmount = salesAmount * (lastTier?.percentage / 100) || 0;
+    const commissionAmount = calculateTieredCommission(
+      salesAmount, 
+      tiers, 
+      mode, 
+      days
+    );
+
+    let finalEffectivePercentage = effectivePercentage;
+    if (finalEffectivePercentage === undefined || finalEffectivePercentage === null) {
+      finalEffectivePercentage = 0;
+    }
 
     const newCommission = await db.tieredCommission.create({
       data: {
@@ -57,6 +68,8 @@ export async function POST(request: NextRequest) {
         commissionAmount,
         mode,
         tiersJson,
+        effectivePercentage: finalEffectivePercentage,
+        days: days ?? null,
       },
       include: { salesPerson: true },
     });

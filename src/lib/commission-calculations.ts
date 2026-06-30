@@ -6,20 +6,47 @@ export interface Tier {
   toAmount: number;
   percentage: number;
 }
-
 // ====== Tiered commission calculation (proportional) ======
-function calculateProportionalCommission(salesAmount: number, tiers: Tier[]): number {
+function calculateProportionalCommission(salesAmount: number, tiers: Tier[], days?: number): number {
   if (tiers.length === 0 || salesAmount <= 0) return 0;
 
-  const boundaries: { amount: number; percentage: number }[] = [];
-  for (let i = 0; i < tiers.length; i++) {
-    if (i === 0) boundaries.push({ amount: tiers[i].fromAmount, percentage: 0 });
-    if (tiers[i].toAmount !== 0) boundaries.push({ amount: tiers[i].toAmount, percentage: tiers[i].percentage });
+  // ✅ فیلتر بر اساس days
+  const tiersWithDays = tiers.filter(t => t.daysRange !== undefined && t.daysRange !== null && t.daysRange > 0);
+  const tiersWithoutDays = tiers.filter(t => t.daysRange === undefined || t.daysRange === null || t.daysRange === 0);
+
+  let selectedTiers: Tier[] = [];
+
+  if (days !== undefined && days !== null && days > 0) {
+    const matchedTiers = tiersWithDays.filter(t => days <= t.daysRange);
+    if (matchedTiers.length > 0) {
+      const sortedMatched = [...matchedTiers].sort((a, b) => Number(a.daysRange) - Number(b.daysRange));
+      selectedTiers = [sortedMatched[0]];
+    } else {
+      selectedTiers = tiersWithoutDays;
+    }
+  } else {
+    selectedTiers = tiersWithoutDays;
   }
 
-  if (salesAmount <= (tiers[0]?.fromAmount ?? 0)) return 0;
+  if (selectedTiers.length === 0) {
+    selectedTiers = tiers;
+  }
 
-  const lastTier = tiers[tiers.length - 1];
+  // ✅ محاسبه با پله‌های انتخاب شده
+  const boundaries: { amount: number; percentage: number }[] = [];
+  for (let i = 0; i < selectedTiers.length; i++) {
+    if (i === 0) boundaries.push({ amount: selectedTiers[i].fromAmount, percentage: 0 });
+    if (selectedTiers[i].toAmount !== 0) {
+      boundaries.push({
+        amount: selectedTiers[i].toAmount,
+        percentage: selectedTiers[i].percentage,
+      });
+    }
+  }
+
+  if (salesAmount <= (selectedTiers[0]?.fromAmount ?? 0)) return 0;
+
+  const lastTier = selectedTiers[selectedTiers.length - 1];
   if (lastTier.toAmount === 0 && salesAmount >= lastTier.fromAmount) {
     return salesAmount * (lastTier.percentage / 100);
   }
@@ -30,7 +57,8 @@ function calculateProportionalCommission(salesAmount: number, tiers: Tier[]): nu
   }
 
   for (let i = 0; i < boundaries.length - 1; i++) {
-    const lower = boundaries[i]; const upper = boundaries[i + 1];
+    const lower = boundaries[i];
+    const upper = boundaries[i + 1];
     if (salesAmount >= lower.amount && salesAmount < upper.amount) {
       const range = upper.amount - lower.amount;
       const progress = (salesAmount - lower.amount) / range;
@@ -42,16 +70,47 @@ function calculateProportionalCommission(salesAmount: number, tiers: Tier[]): nu
 }
 
 // ====== Stepped (ceiling) tiered commission ======
-function calculateSteppedCommission(salesAmount: number, tiers: Tier[]): number {
+function calculateSteppedCommission(salesAmount: number, tiers: Tier[], days?: number): number {
   if (tiers.length === 0 || salesAmount <= 0) return 0;
-  for (let i = tiers.length - 1; i >= 0; i--) {
-    if (salesAmount >= tiers[i].fromAmount) {
-      return salesAmount * (tiers[i].percentage / 100);
+
+  // ✅ فیلتر بر اساس days
+  const tiersWithDays = tiers.filter(t => t.daysRange !== undefined && t.daysRange !== null && t.daysRange > 0);
+  const tiersWithoutDays = tiers.filter(t => t.daysRange === undefined || t.daysRange === null || t.daysRange === 0);
+
+  let selectedTiers: Tier[] = [];
+
+  if (days !== undefined && days !== null && days > 0) {
+    const matchedTiers = tiersWithDays.filter(t => days <= t.daysRange);
+    if (matchedTiers.length > 0) {
+      const sortedMatched = [...matchedTiers].sort((a, b) => Number(a.daysRange) - Number(b.daysRange));
+      selectedTiers = [sortedMatched[0]];
+    } else {
+      selectedTiers = tiersWithoutDays;
+    }
+  } else {
+    selectedTiers = tiersWithoutDays;
+  }
+
+  if (selectedTiers.length === 0) {
+    selectedTiers = tiers;
+  }
+
+  // ✅ محاسبه با پله‌های انتخاب شده
+  for (let i = selectedTiers.length - 1; i >= 0; i--) {
+    if (salesAmount >= selectedTiers[i].fromAmount) {
+      return salesAmount * (selectedTiers[i].percentage / 100);
     }
   }
   return 0;
 }
 
-export function calculateTieredCommission(salesAmount: number, tiers: Tier[], mode: 'proportional' | 'stepped'): number {
-  return mode === 'stepped' ? calculateSteppedCommission(salesAmount, tiers) : calculateProportionalCommission(salesAmount, tiers);
+export function calculateTieredCommission(
+  salesAmount: number, 
+  tiers: Tier[], 
+  mode: 'proportional' | 'stepped', 
+  days?: number  // ← این رو اضافه کن
+): number {
+  return mode === 'stepped' 
+    ? calculateSteppedCommission(salesAmount, tiers, days) 
+    : calculateProportionalCommission(salesAmount, tiers, days);
 }
